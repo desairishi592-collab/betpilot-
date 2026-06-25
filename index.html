@@ -364,45 +364,62 @@ async function checkAndAutoSettle() {
 
   for (const sport of [...new Set(openBets.map(b => b.sport))]) {
     try {
-      const r = await fetch(ESPN[sport] || ESPN['NFL']);
-      const d = await r.json();
-      const events = d.events || [];
+      // check both today and yesterday's scoreboard
+      const urls = [ESPN[sport], ESPN[sport] + '?dates=' + getYesterdayStr()];
+      for (const url of urls) {
+        const d = await safeJson(url);
+        const events = d?.events || [];
+        for (const event of events) {
+          const comp = event.competitions[0];
+          if (!event.status.type.name.includes('FINAL')) continue;
+          const home = comp.competitors.find(c => c.homeAway === 'home');
+          const away = comp.competitors.find(c => c.homeAway === 'away');
+          const homeScore = parseFloat(home.score || 0);
+          const awayScore = parseFloat(away.score || 0);
+          const homeName = home.team.displayName;
+          const awayName = away.team.displayName;
+          const homeAbbr = home.team.abbreviation.toLowerCase();
+          const awayAbbr = away.team.abbreviation.toLowerCase();
+          const homeShort = home.team.shortDisplayName?.toLowerCase() || '';
+          const awayShort = away.team.shortDisplayName?.toLowerCase() || '';
 
-      for (const event of events) {
-        const comp = event.competitions[0];
-        const statusName = event.status.type.name; // STATUS_FINAL, STATUS_IN_PROGRESS etc
-        if (!statusName.includes('FINAL')) continue;
+          for (const bet of openBets.filter(b => b.sport === sport)) {
+            if (bet.status !== 'open') continue;
+            const matchup = bet.matchup.toLowerCase();
+            const pick = bet.pick.toLowerCase();
 
-        const home = comp.competitors.find(c => c.homeAway === 'home');
-        const away = comp.competitors.find(c => c.homeAway === 'away');
-        const homeScore = parseFloat(home.score || 0);
-        const awayScore = parseFloat(away.score || 0);
-        const homeName = home.team.displayName;
-        const awayName = away.team.displayName;
+            // fuzzy match: check if any name variant appears in the matchup string
+            const homeTokens = [homeName.toLowerCase(), homeAbbr, homeShort, ...homeName.toLowerCase().split(' ')];
+            const awayTokens = [awayName.toLowerCase(), awayAbbr, awayShort, ...awayName.toLowerCase().split(' ')];
 
-        for (const bet of openBets.filter(b => b.sport === sport)) {
-          const matchup = bet.matchup.toLowerCase();
-          const isThisGame =
-            matchup.includes(homeName.toLowerCase().split(' ').pop()) ||
-            matchup.includes(awayName.toLowerCase().split(' ').pop());
-          if (!isThisGame) continue;
+            const matchesHome = homeTokens.some(t => t.length > 2 && matchup.includes(t));
+            const matchesAway = awayTokens.some(t => t.length > 2 && matchup.includes(t));
+            if (!matchesHome && !matchesAway) continue;
 
-          const pickLower = bet.pick.toLowerCase();
-          const pickIsHome = homeName.toLowerCase().includes(pickLower.split(' ').pop());
-          const pickIsAway = awayName.toLowerCase().includes(pickLower.split(' ').pop());
+            // figure out which side the bet is on
+            const pickMatchesHome = homeTokens.some(t => t.length > 2 && pick.includes(t));
+            const pickMatchesAway = awayTokens.some(t => t.length > 2 && pick.includes(t));
 
-          let result;
-          if (homeScore === awayScore) result = 'pushed';
-          else if (pickIsHome && homeScore > awayScore) result = 'won';
-          else if (pickIsAway && awayScore > homeScore) result = 'won';
-          else result = 'lost';
+            let result;
+            if (homeScore === awayScore) result = 'pushed';
+            else if (pickMatchesHome && homeScore > awayScore) result = 'won';
+            else if (pickMatchesAway && awayScore > homeScore) result = 'won';
+            else if (!pickMatchesHome && !pickMatchesAway) continue; // can't determine pick side
+            else result = 'lost';
 
-          autoSettle(bet.id, result, homeName, awayName, homeScore, awayScore);
+            autoSettle(bet.id, result, homeName, awayName, homeScore, awayScore);
+          }
         }
       }
     } catch(e) { /* silently skip */ }
   }
 }
+
+function getYesterdayStr() {
+  const d = new Date(); d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0,10).replace(/-/g,'');
+}
+
 
 function autoSettle(id, result, home, away, homeScore, awayScore) {
   const b = S.bets.find(x => x.id === id);
