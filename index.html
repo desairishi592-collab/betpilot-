@@ -183,6 +183,7 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:
         <button class="quick-btn" onclick="quickSend('What is the best bet right now?')">🔥 Best bet now</button>
         <button class="quick-btn" onclick="quickSend('Give me a safe pick today')">🛡 Safe pick</button>
         <button class="quick-btn" onclick="quickSend('How is my bankroll doing?')">💰 Bankroll</button>
+        <button class="quick-btn" onclick="quickSend('Give me a parlay suggestion for today')">🎰 Parlay</button>
       </div>
       <div class="input-row">
         <input class="chat-input" id="chatInput" placeholder="Ask about any game..." onkeydown="if(event.key==='Enter'){event.preventDefault();sendMsg()}">
@@ -633,15 +634,15 @@ CURRENT DATA FOR ${S.sport}:
 ${dataContext}
 
 RULES:
-1. Use the data above to make your analysis. It includes schedules, injury reports, team records, recent form, latest news, standings, and prediction market probabilities where available.
-2. Never mention where the data comes from — just use it naturally in your analysis. Say things like "they've won 4 of their last 5" or "their key player is questionable" without citing a source.
-3. When recommending a bet: pick ONE game, give 2-3 sentences of specific analysis using the real data, estimate win probability, suggest decimal odds.
-4. If prediction market data is available, factor it into your probability estimate — it reflects real money and is a strong signal.
-5. ALWAYS end bet recommendations with this exact line:
-   BETCARD:{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"one line of specific analysis","prob":0.62,"suggestedOdds":2.10,"market":"Moneyline"}
-6. Max 3 short paragraphs. Use **bold** for key points.
-7. If no games today, say so and offer to look at another sport.
-8. Never ask the user to manually settle bets — it's handled automatically.`;
+1. Use the data above — schedules, injuries, records, form, news, standings, prediction market odds. Never mention data sources.
+2. For a single bet: pick ONE game, 2-3 sentences of specific analysis, estimate win probability, suggest decimal odds. End with:
+   BETCARD:{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"one line citing real data","prob":0.62,"suggestedOdds":2.10,"market":"Moneyline"}
+3. For a PARLAY request: find 2-3 games today where you have high confidence (60%+ each). Briefly explain why each leg is strong. End with a JSON array (all on one line):
+   PARLAY:[{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"reason","prob":0.62,"odds":1.85},{"matchup":"Team C vs Team D","sport":"${S.sport}","pick":"Team C","reason":"reason","prob":0.65,"odds":1.75}]
+4. For parlays: only suggest when you genuinely have 2-3 high confidence picks. Never force a parlay if the games aren't there.
+5. Max 3 short paragraphs. Use **bold** for key points.
+6. If no games today, say so and offer another sport.
+7. Never ask the user to manually settle bets — it's automatic.`;
 
   const chatHistory = (sportChats[S.sport] || [])
     .filter(m => m.role === 'user' || m.role === 'assistant')
@@ -663,11 +664,22 @@ RULES:
     if (data.error) { removeTyping(); addMsg('ai',`Error: ${data.error.message}`,''); return; }
     const raw = data.choices[0].message.content;
     removeTyping();
-    // Match BETCARD anywhere in the response, including inline or after newline
-    const bcMatch = raw.match(/BETCARD:\s*(\{[\s\S]*?\})/);
-    if (bcMatch) {
+    // Check for PARLAY first
+    const parlayMatch = raw.match(/PARLAY:\s*(\[[\s\S]*?\])/);
+    const betMatch = raw.match(/BETCARD:\s*(\{[\s\S]*?\})/);
+
+    if (parlayMatch) {
       try {
-        const bc = JSON.parse(bcMatch[1]);
+        const legs = JSON.parse(parlayMatch[1]);
+        const sr = calcParlayStake(legs);
+        S.pendingBet = { isParlay:true, legs, stake:sr.stake, combinedOdds:sr.combinedOdds, combinedProb:sr.combinedProb, sport:legs[0].sport, id:Date.now().toString() };
+        save();
+        const cleanText = raw.replace(/PARLAY:\s*\[[\s\S]*?\]/, '').trim();
+        addMsg('ai', mdToHtml(cleanText) + buildParlayCard(legs, sr), raw);
+      } catch(e) { addMsg('ai', mdToHtml(raw), raw); }
+    } else if (betMatch) {
+      try {
+        const bc = JSON.parse(betMatch[1]);
         const sr = calcStake(bc.prob, bc.suggestedOdds||2.0);
         S.pendingBet = {...bc, stake:sr.stake, stakeResult:sr, id:Date.now().toString()};
         save();
@@ -726,6 +738,77 @@ function skipBet() {
   S.pendingBet=null; save();
   addMsg('ai',"Skipped. Want me to look at a different game?",'');
 }
+
+/* ── PARLAY LOGIC ── */
+function calcParlayStake(legs) {
+  // Combined odds = product of all leg odds
+  // Combined prob = product of all leg probs (assumes independence)
+  const combinedOdds = legs.reduce((acc, l) => acc * l.odds, 1);
+  const combinedProb = legs.reduce((acc, l) => acc * l.prob, 1);
+  const prof = PROFILES[S.risk];
+  const openExp = S.bets.filter(b => b.status === 'open').reduce((s, b) => s + b.stake, 0);
+  const imp = 1 / combinedOdds;
+  const edge = combinedProb - imp;
+  const ev = combinedProb * (combinedOdds - 1) - (1 - combinedProb);
+  if (edge < prof.minEdge) return { stake: 0, edge, ev, combinedOdds, combinedProb, reason: `Parlay edge ${(edge*100).toFixed(1)}% below minimum` };
+  const fk = Math.max((combinedOdds - 1) * combinedProb - (1 - combinedProb), 0) / (combinedOdds - 1);
+  if (fk <= 0) return { stake: 0, edge, ev, combinedOdds, combinedProb, reason: 'No Kelly edge on parlay' };
+  // Use half the normal Kelly fraction for parlays — they're riskier
+  const frac = Math.min(fk * prof.kf * 0.5, prof.maxS * 0.6);
+  const room = Math.max(S.bankroll * prof.maxE - openExp, 0);
+  const stake = Math.min(S.bankroll * frac, room);
+  if (stake <= 0) return { stake: 0, edge, ev, combinedOdds, combinedProb, reason: 'Exposure cap reached' };
+  return { stake: Math.round(stake * 100) / 100, edge, ev, combinedOdds, combinedProb, usedPct: ((stake/S.bankroll)*100).toFixed(1), reason: '' };
+}
+
+function buildParlayCard(legs, sr) {
+  const canBet = sr.stake > 0;
+  const potReturn = sr.stake * sr.combinedOdds;
+  const edgec = sr.edge > 0 ? 'var(--teal)' : 'var(--red)';
+  const evc = sr.ev > 0 ? 'var(--green)' : 'var(--red)';
+  return `<div class="bet-card" style="border-color:var(--amber)">
+    <div class="bet-card-sport" style="color:var(--amber)">${legs[0].sport} · ${legs.length}-LEG PARLAY</div>
+    <div class="bet-card-matchup" style="font-size:16px">${legs.map(l => l.pick).join(' + ')}</div>
+    <div style="margin-bottom:10px">
+      ${legs.map(l => `<div style="font-size:12px;color:var(--muted);margin-bottom:3px">
+        <strong style="color:var(--txt)">${l.pick}</strong> — ${l.matchup} @ ${l.odds.toFixed(2)}
+      </div>`).join('')}
+    </div>
+    <div class="bet-stats">
+      <div class="bet-stat"><div class="bet-stat-val" style="color:${edgec}">${sr.edge>=0?'+':''}${(sr.edge*100).toFixed(1)}%</div><div class="bet-stat-lbl">Edge</div></div>
+      <div class="bet-stat"><div class="bet-stat-val" style="color:var(--amber)">${sr.combinedOdds.toFixed(2)}x</div><div class="bet-stat-lbl">Combined odds</div></div>
+      <div class="bet-stat"><div class="bet-stat-val">${(sr.combinedProb*100).toFixed(0)}%</div><div class="bet-stat-lbl">Win prob</div></div>
+    </div>
+    ${canBet
+      ? `<div style="margin-bottom:10px;font-size:13px;color:var(--muted)">Stake: <strong style="color:var(--txt);font-size:15px">$${sr.stake.toFixed(2)}</strong> <span style="color:var(--muted)">(${sr.usedPct}% of bankroll)</span> → potential <strong style="color:var(--amber)">$${potReturn.toFixed(2)}</strong></div>
+       <div class="bet-actions">
+         <button class="bet-btn yes" style="background:var(--amber);color:#080C16" onclick="logParlay()">🎰 Log parlay — $${sr.stake.toFixed(2)}</button>
+         <button class="bet-btn no" onclick="skipBet()">Skip</button>
+       </div>`
+      : `<div style="background:rgba(255,71,87,.08);border:1px solid rgba(255,71,87,.2);border-radius:8px;padding:10px;font-size:13px;color:var(--red)">${sr.reason}</div>`
+    }
+  </div>`;
+}
+
+function logParlay() {
+  if (!S.pendingBet || !S.pendingBet.isParlay) return;
+  const b = S.pendingBet;
+  const bet = {
+    id: b.id, sport: b.sport,
+    matchup: b.legs.map(l => l.matchup).join(' + '),
+    pick: b.legs.map(l => l.pick).join(' + '),
+    market: `${b.legs.length}-Leg Parlay`,
+    stake: b.stake, odds: b.combinedOdds,
+    status: 'open', placedAt: new Date().toISOString(), pnl: null,
+    isParlay: true, legs: b.legs
+  };
+  S.bets.push(bet);
+  S.bankroll = Math.round((S.bankroll - b.stake) * 100) / 100;
+  S.pendingBet = null; save(); renderSidebar();
+  const msg = `Parlay logged ✓\n\n**$${bet.stake.toFixed(2)}** on ${bet.legs.length} legs\nPotential return: **$${(bet.stake*bet.odds).toFixed(2)}**\n\n⚡ All legs must win. I'll auto-settle when results are in.`;
+  addMsg('ai', mdToHtml(msg), msg);
+}
+
 
 function settleBet(id, result) {
   const b = S.bets.find(x=>x.id===id); if(!b||b.status!=='open') return;
