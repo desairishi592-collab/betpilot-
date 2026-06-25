@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BetPilot</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080C16;--surface:#0E1420;--card:#141B2D;--border:#1E2A42;--border2:#2A3A5C;
+  --teal:#00E5B4;--teal2:#00B890;--amber:#FFB627;--red:#FF4757;--green:#2ED573;
+  --txt:#EEF2FF;--muted:#6B7FA3;--dim:#2A3450;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* SETUP */
+.setup{position:fixed;inset:0;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px}
+.setup-box{background:var(--card);border:1px solid var(--border2);border-radius:20px;padding:36px;max-width:400px;width:100%}
+.setup-logo{font-family:'Barlow Condensed',sans-serif;font-size:38px;font-weight:700;color:var(--teal);letter-spacing:2px;margin-bottom:4px}
+.setup-sub{color:var(--muted);font-size:13px;line-height:1.6;margin-bottom:28px}
+.setup-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px;display:block}
+.setup-input{width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:11px 14px;color:var(--txt);font-size:14px;font-family:'Inter',sans-serif;margin-bottom:16px}
+.setup-input:focus{outline:none;border-color:var(--teal)}
+.risk-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:24px}
+.risk-opt{padding:12px 8px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);cursor:pointer;text-align:center;transition:all .15s}
+.risk-opt:hover{border-color:var(--teal2)}
+.risk-opt.on{border-color:var(--teal);background:rgba(0,229,180,.08)}
+.risk-name{font-size:13px;font-weight:600;color:var(--txt);display:block;margin-bottom:3px}
+.risk-opt.on .risk-name{color:var(--teal)}
+.risk-desc{font-size:10px;color:var(--muted);line-height:1.3}
+.setup-btn{width:100%;background:var(--teal);color:#080C16;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;letter-spacing:.3px}
+.setup-btn:hover{background:var(--teal2)}
+
+/* LAYOUT */
+.app{display:grid;grid-template-columns:1fr 340px;height:100vh;overflow:hidden}
+@media(max-width:768px){.app{grid-template-columns:1fr;grid-template-rows:1fr auto}}
+
+/* CHAT PANEL */
+.chat-panel{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
+.chat-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.chat-logo{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:700;color:var(--teal);letter-spacing:1px}
+.chat-sport-tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.chat-sport-tabs::-webkit-scrollbar{display:none}
+.sport-pill{padding:5px 11px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;white-space:nowrap;font-family:'Inter',sans-serif;transition:all .15s}
+.sport-pill:hover{color:var(--txt);border-color:var(--teal2)}
+.sport-pill.on{background:var(--teal);color:#080C16;border-color:var(--teal);font-weight:600}
+
+.messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+.messages::-webkit-scrollbar{width:4px}
+.messages::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+.msg{max-width:85%;display:flex;flex-direction:column;gap:4px}
+.msg.user{align-self:flex-end}
+.msg.ai{align-self:flex-start}
+.msg-bubble{padding:12px 16px;border-radius:16px;font-size:14px;line-height:1.6}
+.msg.user .msg-bubble{background:var(--teal);color:#080C16;border-radius:16px 16px 4px 16px;font-weight:500}
+.msg.ai .msg-bubble{background:var(--card);border:1px solid var(--border2);border-radius:16px 16px 16px 4px}
+.msg-time{font-size:11px;color:var(--muted)}
+.msg.user .msg-time{text-align:right}
+
+.bet-card{background:var(--surface);border:1px solid var(--teal);border-radius:12px;padding:14px;margin-top:8px}
+.bet-card-sport{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--teal);margin-bottom:6px;font-weight:600}
+.bet-card-matchup{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;margin-bottom:8px}
+.bet-card-pick{font-size:13px;color:var(--muted);margin-bottom:12px}
+.bet-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.bet-stat{background:var(--card);border-radius:8px;padding:8px 10px;text-align:center}
+.bet-stat-val{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:600}
+.bet-stat-lbl{font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.5px}
+.bet-actions{display:flex;gap:8px}
+.bet-btn{flex:1;padding:9px;border-radius:8px;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s}
+.bet-btn.yes{background:var(--teal);color:#080C16}
+.bet-btn.yes:hover{background:var(--teal2)}
+.bet-btn.no{background:var(--dim);color:var(--muted);border:1px solid var(--border2)}
+.bet-btn.no:hover{color:var(--txt)}
+
+.typing{align-self:flex-start;display:flex;gap:5px;align-items:center;padding:14px 16px;background:var(--card);border:1px solid var(--border2);border-radius:16px 16px 16px 4px}
+.typing span{width:7px;height:7px;border-radius:50%;background:var(--teal);display:inline-block;animation:bounce .9s infinite}
+.typing span:nth-child(2){animation-delay:.15s}
+.typing span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+
+.input-area{padding:16px 20px;border-top:1px solid var(--border);flex-shrink:0}
+.input-row{display:flex;gap:10px;align-items:center}
+.chat-input{flex:1;background:var(--card);border:1px solid var(--border2);border-radius:24px;padding:11px 18px;color:var(--txt);font-size:14px;font-family:'Inter',sans-serif;transition:border-color .15s}
+.chat-input:focus{outline:none;border-color:var(--teal)}
+.send-btn{width:40px;height:40px;border-radius:50%;background:var(--teal);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s}
+.send-btn:hover{background:var(--teal2)}
+.send-btn svg{width:16px;height:16px;fill:#080C16}
+.quick-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.quick-btn{padding:6px 12px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s;white-space:nowrap}
+.quick-btn:hover{border-color:var(--teal);color:var(--teal)}
+
+/* SIDEBAR */
+.sidebar{background:var(--surface);overflow-y:auto;display:flex;flex-direction:column}
+.sidebar::-webkit-scrollbar{width:4px}
+.sidebar::-webkit-scrollbar-thumb{background:var(--border2)}
+
+.bankroll-section{padding:20px;border-bottom:1px solid var(--border)}
+.bankroll-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.bankroll-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+.settings-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:2px}
+.settings-btn:hover{color:var(--txt)}
+.bankroll-num{font-family:'Barlow Condensed',sans-serif;font-size:44px;font-weight:700;color:var(--teal);line-height:1;margin-bottom:4px}
+.bankroll-growth{font-size:13px;font-weight:600}
+.meter-track{height:4px;background:var(--dim);border-radius:2px;overflow:hidden;margin-top:10px}
+.meter-fill{height:100%;border-radius:2px;background:var(--teal);transition:width .6s}
+.meter-fill.warn{background:var(--amber)}
+.meter-fill.crit{background:var(--red)}
+.stats-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.stat-box{background:var(--card);border-radius:8px;padding:10px}
+.stat-val{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:600}
+.stat-lbl{font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+
+.sidebar-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.stab{flex:1;padding:10px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif;border-bottom:2px solid transparent;transition:all .15s}
+.stab.on{color:var(--teal);border-bottom-color:var(--teal)}
+
+.bets-section{padding:16px 20px;flex:1}
+.bet-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;border-left:3px solid var(--amber)}
+.bet-item.won{border-left-color:var(--green)}
+.bet-item.lost{border-left-color:var(--red)}
+.bet-matchup{font-size:13px;font-weight:600;margin-bottom:4px}
+.bet-detail{font-size:11px;color:var(--muted);margin-bottom:8px}
+.bet-row{display:flex;justify-content:space-between;align-items:center}
+.bet-amount{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:600}
+.settle-btns{display:flex;gap:4px}
+.s-btn{padding:4px 8px;border-radius:6px;border:none;font-size:11px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif}
+.s-btn.w{background:rgba(46,213,115,.15);color:var(--green)}
+.s-btn.l{background:rgba(255,71,87,.15);color:var(--red)}
+.s-btn.p{background:var(--dim);color:var(--muted)}
+.empty-bets{text-align:center;padding:30px 10px;color:var(--muted);font-size:13px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+
+<!-- SETUP: only bankroll + risk, no API key -->
+<div class="setup" id="setup">
+  <div class="setup-box">
+    <div class="setup-logo">BETPILOT</div>
+    <div class="setup-sub">AI-powered bankroll advisor for NFL, NBA, NHL, MLB &amp; Soccer. Tells you who to bet on and how much — you just say yes or no.</div>
+
+    <label class="setup-label">Your starting bankroll ($)</label>
+    <input class="setup-input" type="number" id="setupBankroll" value="100" min="10">
+
+    <label class="setup-label">Risk profile</label>
+    <div class="risk-row">
+      <div class="risk-opt" data-r="conservative" onclick="pickRisk(this)">
+        <span class="risk-name">Safe</span>
+        <span class="risk-desc">Max 3% per bet · 5% min edge</span>
+      </div>
+      <div class="risk-opt on" data-r="moderate" onclick="pickRisk(this)">
+        <span class="risk-name">Moderate</span>
+        <span class="risk-desc">Max 5% per bet · 3% min edge</span>
+      </div>
+      <div class="risk-opt" data-r="aggressive" onclick="pickRisk(this)">
+        <span class="risk-name">Bold</span>
+        <span class="risk-desc">Max 8% per bet · 2% min edge</span>
+      </div>
+    </div>
+
+    <button class="setup-btn" onclick="startApp()">Let's go →</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="app" id="app" style="display:none">
+  <div class="chat-panel">
+    <div class="chat-header">
+      <div class="chat-logo">BETPILOT</div>
+      <div class="chat-sport-tabs">
+        <button class="sport-pill on" data-s="NFL" onclick="setSport(this)">🏈 NFL</button>
+        <button class="sport-pill" data-s="NBA" onclick="setSport(this)">🏀 NBA</button>
+        <button class="sport-pill" data-s="NHL" onclick="setSport(this)">🏒 NHL</button>
+        <button class="sport-pill" data-s="MLB" onclick="setSport(this)">⚾ MLB</button>
+        <button class="sport-pill" data-s="Soccer" onclick="setSport(this)">⚽ Soccer</button>
+      </div>
+    </div>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="input-area">
+      <div class="quick-btns">
+        <button class="quick-btn" onclick="quickSend('What games are on today?')">📅 Today's games</button>
+        <button class="quick-btn" onclick="quickSend('What is the best bet right now?')">🔥 Best bet now</button>
+        <button class="quick-btn" onclick="quickSend('How is my bankroll doing?')">💰 My bankroll</button>
+        <button class="quick-btn" onclick="quickSend('Give me a safe bet today')">🛡 Safe pick</button>
+      </div>
+      <div class="input-row">
+        <input class="chat-input" id="chatInput" placeholder="Ask about any game or sport..." onkeydown="if(event.key==='Enter'){event.preventDefault();sendMsg()}">
+        <button class="send-btn" onclick="sendMsg()">
+          <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="bankroll-section">
+      <div class="bankroll-top">
+        <span class="bankroll-label">Bankroll</span>
+        <button class="settings-btn" onclick="openSetup()" title="Settings">⚙</button>
+      </div>
+      <div class="bankroll-num" id="brNum">$0</div>
+      <div class="bankroll-growth" id="brGrowth"></div>
+      <div class="meter-track"><div class="meter-fill" id="brMeter" style="width:100%"></div></div>
+      <div class="stats-row" id="statsRow"></div>
+    </div>
+
+    <div class="sidebar-tabs">
+      <button class="stab on" id="tabOpen" onclick="sideTab('open')">Open Bets</button>
+      <button class="stab" id="tabHistory" onclick="sideTab('history')">History</button>
+    </div>
+
+    <div class="bets-section" id="viewOpen"><div id="openList"></div></div>
+    <div class="bets-section hidden" id="viewHistory"><div id="historyList"></div></div>
+  </div>
+</div>
+
+<script>
+const PROFILES={
+  conservative:{kf:.15,maxS:.03,maxE:.20,minEdge:.05,label:'Safe'},
+  moderate:{kf:.25,maxS:.05,maxE:.30,minEdge:.03,label:'Moderate'},
+  aggressive:{kf:.40,maxS:.08,maxE:.40,minEdge:.02,label:'Bold'}
+};
+
+let S={bankroll:100,start:100,risk:'moderate',sport:'NFL',bets:[],pendingBet:null,chatHistory:[],initialized:false};
+
+function save(){localStorage.setItem('bp4',JSON.stringify(S))}
+function load(){try{const d=localStorage.getItem('bp4');if(d)S={...S,...JSON.parse(d)}}catch(e){}}
+
+function pickRisk(el){
+  document.querySelectorAll('.risk-opt').forEach(x=>x.classList.remove('on'));
+  el.classList.add('on');
+}
+
+function startApp(){
+  const br=parseFloat(document.getElementById('setupBankroll').value);
+  if(!br||br<10){alert('Enter a bankroll of at least $10');return}
+  const risk=document.querySelector('.risk-opt.on')?.dataset.r||'moderate';
+  const isNew=!S.initialized;
+  if(isNew){S.bankroll=br;S.start=br;S.bets=[];S.chatHistory=[]}
+  S.risk=risk;S.initialized=true;
+  save();
+  document.getElementById('setup').style.display='none';
+  document.getElementById('app').style.display='grid';
+  renderSidebar();
+  if(isNew)greet();
+}
+
+function openSetup(){
+  document.getElementById('setupBankroll').value=S.start;
+  document.querySelectorAll('.risk-opt').forEach(x=>x.classList.toggle('on',x.dataset.r===S.risk));
+  document.getElementById('setup').style.display='flex';
+}
+
+function setSport(el){
+  document.querySelectorAll('.sport-pill').forEach(x=>x.classList.remove('on'));
+  el.classList.add('on');S.sport=el.dataset.s;save();
+}
+
+function kelly(p,odds){
+  const b=odds-1;if(b<=0)return 0;
+  return Math.max((b*p-(1-p))/b,0);
+}
+
+function calcStake(p,odds){
+  const prof=PROFILES[S.risk];
+  const openExp=S.bets.filter(b=>b.status==='open').reduce((s,b)=>s+b.stake,0);
+  const imp=1/odds;const edge=p-imp;const ev=p*(odds-1)-(1-p);
+  if(edge<prof.minEdge)return{stake:0,edge,ev,imp,reason:`Edge ${(edge*100).toFixed(1)}% below ${(prof.minEdge*100).toFixed(0)}% minimum — pass`};
+  const fk=kelly(p,odds);
+  if(fk<=0)return{stake:0,edge,ev,imp,reason:'No Kelly edge — pass'};
+  const frac=Math.min(fk*prof.kf,prof.maxS);
+  const room=Math.max(S.bankroll*prof.maxE-openExp,0);
+  const stake=Math.min(S.bankroll*frac,room);
+  if(stake<=0)return{stake:0,edge,ev,imp,reason:'Exposure cap reached — wait for bets to settle'};
+  return{stake:Math.round(stake*100)/100,edge,ev,imp,fkPct:(fk*100).toFixed(1),usedPct:((stake/S.bankroll)*100).toFixed(1),reason:''};
+}
+
+function addMsg(role,html,raw){
+  const msgs=document.getElementById('messages');
+  const div=document.createElement('div');
+  div.className=`msg ${role}`;
+  const time=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  div.innerHTML=`<div class="msg-bubble">${html}</div><div class="msg-time">${time}</div>`;
+  msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
+  if(raw&&role==='ai')S.chatHistory.push({role:'assistant',content:raw});
+}
+
+function addTyping(){
+  const msgs=document.getElementById('messages');
+  const div=document.createElement('div');
+  div.className='typing';div.id='typing';
+  div.innerHTML='<span></span><span></span><span></span>';
+  msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
+}
+function removeTyping(){document.getElementById('typing')?.remove()}
+
+function greet(){
+  const p=PROFILES[S.risk];
+  const txt=`Hey! I'm BetPilot 👋\n\nYou're set up with **$${S.start.toFixed(2)}** on **${p.label}** mode.\n\nTell me what sport you want to bet on and I'll show you today's schedule, pick the best game, and tell you exactly who to back and how much. Just say yes or no.\n\nWhat are we betting on today?`;
+  addMsg('ai',mdToHtml(txt),txt);
+}
+
+function mdToHtml(s){
+  return s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/\n\n/g,'</p><p style="margin-top:8px">').replace(/\n/g,'<br>');
+}
+
+async function sendMsg(){
+  const inp=document.getElementById('chatInput');
+  const msg=inp.value.trim();if(!msg)return;
+  inp.value='';
+  addMsg('user',escHtml(msg));
+  S.chatHistory.push({role:'user',content:msg});
+  await callAI();
+}
+
+function quickSend(msg){document.getElementById('chatInput').value=msg;sendMsg()}
+
+async function callAI(){
+  const p=PROFILES[S.risk];
+  const openBets=S.bets.filter(b=>b.status==='open');
+  const settled=S.bets.filter(b=>b.status!=='open');
+  const pnl=settled.reduce((s,b)=>s+(b.pnl||0),0);
+  const totalStaked=settled.reduce((s,b)=>s+b.stake,0);
+  const roi=totalStaked>0?(pnl/totalStaked*100):0;
+
+  const system=`You are BetPilot, an expert AI sports betting advisor. Be direct and confident.
+
+USER STATE:
+- Sport: ${S.sport} | Date: ${new Date().toDateString()}
+- Bankroll: $${S.bankroll.toFixed(2)} (started $${S.start.toFixed(2)})
+- Risk: ${p.label} — max ${(p.maxS*100).toFixed(0)}% per bet, needs ${(p.minEdge*100).toFixed(0)}%+ edge
+- Open bets: ${openBets.length>0?openBets.map(b=>`${b.matchup} $${b.stake} on ${b.pick}`).join(', '):'none'}
+- ROI: ${roi.toFixed(1)}% | P&L: ${pnl>=0?'+':''}$${pnl.toFixed(2)}
+
+RULES:
+1. When asked about schedule: List real games happening today for that sport with teams and times.
+2. When giving a pick: Choose ONE game, give 2-3 sentences of real analysis (form, injuries, matchup), then estimate a win probability and suggest decimal odds.
+3. ALWAYS end recommendations with this exact JSON on its own line:
+   BETCARD:{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"one line reason","prob":0.62,"suggestedOdds":2.10,"market":"Moneyline"}
+4. Keep responses short — max 3 paragraphs. Use **bold** for key points.
+5. Use real current knowledge. Say "based on recent form" not "I can't access real-time data".`;
+
+  addTyping();
+  try{
+    const resp=await fetch('/api/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'llama-3.3-70b-versatile',
+        max_tokens:1024,
+        temperature:0.7,
+        messages:[{role:'system',content:system},...S.chatHistory.slice(-12)]
+      })
+    });
+    const data=await resp.json();
+    if(data.error){removeTyping();addMsg('ai',`Error: ${data.error.message||JSON.stringify(data.error)}`,'');return}
+    const raw=data.choices[0].message.content;
+    removeTyping();
+    const bcMatch=raw.match(/BETCARD:(\{[^\n]+\})/);
+    if(bcMatch){
+      try{
+        const bc=JSON.parse(bcMatch[1]);
+        const cleanText=raw.replace(/BETCARD:[^\n]+/,'').trim();
+        const sr=calcStake(bc.prob,bc.suggestedOdds||2.0);
+        S.pendingBet={...bc,stake:sr.stake,stakeResult:sr,id:Date.now().toString()};
+        save();
+        addMsg('ai',mdToHtml(cleanText)+buildBetCard(bc,sr),raw);
+      }catch(e){addMsg('ai',mdToHtml(raw),raw)}
+    }else{
+      addMsg('ai',mdToHtml(raw),raw);
+    }
+    if(S.chatHistory.length>24)S.chatHistory=S.chatHistory.slice(-24);
+    save();
+  }catch(e){
+    removeTyping();
+    addMsg('ai','Connection error. Make sure the app is deployed on Vercel.','');
+  }
+}
+
+function buildBetCard(bc,sr){
+  const ec=sr.ev>0?'var(--green)':'var(--red)';
+  const edgec=sr.edge>0?'var(--teal)':'var(--red)';
+  const canBet=sr.stake>0;
+  return`<div class="bet-card">
+    <div class="bet-card-sport">${bc.sport} · ${bc.market||'Moneyline'}</div>
+    <div class="bet-card-matchup">${bc.matchup}</div>
+    <div class="bet-card-pick">Pick: <strong style="color:var(--teal)">${bc.pick}</strong> · ${bc.reason}</div>
+    <div class="bet-stats">
+      <div class="bet-stat"><div class="bet-stat-val" style="color:${edgec}">${sr.edge>=0?'+':''}${(sr.edge*100).toFixed(1)}%</div><div class="bet-stat-lbl">Edge</div></div>
+      <div class="bet-stat"><div class="bet-stat-val" style="color:${ec}">${sr.ev>=0?'+':''}${sr.ev.toFixed(3)}</div><div class="bet-stat-lbl">EV/$1</div></div>
+      <div class="bet-stat"><div class="bet-stat-val">${(bc.prob*100).toFixed(0)}%</div><div class="bet-stat-lbl">Win prob</div></div>
+    </div>
+    ${canBet
+      ?`<div style="margin-bottom:10px;font-size:13px;color:var(--muted)">Stake: <strong style="color:var(--txt);font-size:16px">$${sr.stake.toFixed(2)}</strong> <span style="color:var(--muted)">(${sr.usedPct}% of bankroll)</span></div>
+         <div class="bet-actions">
+           <button class="bet-btn yes" onclick="logBet()">✓ Log this bet — $${sr.stake.toFixed(2)}</button>
+           <button class="bet-btn no" onclick="skipBet()">Skip</button>
+         </div>`
+      :`<div style="background:rgba(255,71,87,.08);border:1px solid rgba(255,71,87,.2);border-radius:8px;padding:10px;font-size:13px;color:var(--red)">${sr.reason}</div>`
+    }
+  </div>`;
+}
+
+function logBet(){
+  if(!S.pendingBet)return;
+  const b=S.pendingBet;
+  const bet={id:b.id,sport:b.sport,matchup:b.matchup,pick:b.pick,market:b.market||'Moneyline',stake:b.stake,odds:b.suggestedOdds||2.0,status:'open',placedAt:new Date().toISOString(),pnl:null};
+  S.bets.push(bet);
+  S.bankroll=Math.round((S.bankroll-b.stake)*100)/100;
+  S.pendingBet=null;save();renderSidebar();
+  const msg=`Bet logged ✓\n\n**$${bet.stake.toFixed(2)}** on **${bet.pick}** (${bet.matchup})\nPotential return: **$${(bet.stake*bet.odds).toFixed(2)}**\n\nTracked in your sidebar. Want another pick?`;
+  addMsg('ai',mdToHtml(msg),msg);
+}
+
+function skipBet(){
+  S.pendingBet=null;save();
+  addMsg('ai',"Skipped. Want me to look at a different game or sport?",'');
+}
+
+function settleBet(id,result){
+  const b=S.bets.find(x=>x.id===id);if(!b||b.status!=='open')return;
+  b.status=result;b.settledAt=new Date().toISOString();
+  if(result==='won'){b.pnl=Math.round((b.stake*b.odds-b.stake)*100)/100;S.bankroll=Math.round((S.bankroll+b.stake*b.odds)*100)/100}
+  else if(result==='pushed'){b.pnl=0;S.bankroll=Math.round((S.bankroll+b.stake)*100)/100}
+  else{b.pnl=-b.stake}
+  save();renderSidebar();
+}
+
+function renderSidebar(){
+  const growth=((S.bankroll-S.start)/S.start*100);
+  const gc=growth>=0?'var(--green)':'var(--red)';
+  document.getElementById('brNum').textContent=`$${S.bankroll.toFixed(2)}`;
+  document.getElementById('brGrowth').innerHTML=`<span style="color:${gc}">${growth>=0?'+':''}${growth.toFixed(1)}% from start</span>`;
+  const pct=Math.min((S.bankroll/S.start)*100,100);
+  const fill=document.getElementById('brMeter');
+  fill.style.width=Math.max(pct,2)+'%';
+  fill.className='meter-fill'+(pct<50?' crit':pct<75?' warn':'');
+  const open=S.bets.filter(b=>b.status==='open');
+  const settled=S.bets.filter(b=>b.status!=='open');
+  const pnl=settled.reduce((s,b)=>s+(b.pnl||0),0);
+  const wins=settled.filter(b=>b.status==='won').length;
+  const totalStaked=settled.reduce((s,b)=>s+b.stake,0);
+  const roi=totalStaked>0?(pnl/totalStaked*100):0;
+  const exp=open.reduce((s,b)=>s+b.stake,0);
+  document.getElementById('statsRow').innerHTML=`
+    <div class="stat-box"><div class="stat-val" style="color:var(--amber)">$${exp.toFixed(2)}</div><div class="stat-lbl">Exposure</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:${roi>=0?'var(--green)':'var(--red)'}">${roi>=0?'+':''}${roi.toFixed(1)}%</div><div class="stat-lbl">ROI</div></div>
+    <div class="stat-box"><div class="stat-val">${wins}/${settled.length}</div><div class="stat-lbl">W/Settled</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:${pnl>=0?'var(--green)':'var(--red)'}">${pnl>=0?'+':''}$${pnl.toFixed(2)}</div><div class="stat-lbl">P&L</div></div>`;
+  document.getElementById('openList').innerHTML=open.length===0
+    ?'<div class="empty-bets">No open bets.<br>Ask BetPilot for a pick!</div>'
+    :open.map(b=>`<div class="bet-item">
+      <div class="bet-matchup">${b.matchup}</div>
+      <div class="bet-detail">${b.sport} · ${b.pick} · ${b.market} · @${b.odds.toFixed(2)}</div>
+      <div class="bet-row">
+        <div class="bet-amount">$${b.stake.toFixed(2)}<span style="font-size:11px;color:var(--muted)"> → $${(b.stake*b.odds).toFixed(2)}</span></div>
+        <div class="settle-btns">
+          <button class="s-btn w" onclick="settleBet('${b.id}','won')">Won</button>
+          <button class="s-btn l" onclick="settleBet('${b.id}','lost')">Lost</button>
+          <button class="s-btn p" onclick="settleBet('${b.id}','pushed')">Push</button>
+        </div>
+      </div></div>`).join('');
+  const hist=[...S.bets].filter(b=>b.status!=='open').reverse();
+  document.getElementById('historyList').innerHTML=hist.length===0
+    ?'<div class="empty-bets">No settled bets yet.</div>'
+    :hist.map(b=>{
+      const pc=b.pnl>0?'var(--green)':b.pnl<0?'var(--red)':'var(--muted)';
+      const ps=b.pnl!=null?(b.pnl>=0?'+':'')+`$${Math.abs(b.pnl).toFixed(2)}`:'';
+      return`<div class="bet-item ${b.status}">
+        <div class="bet-matchup">${b.matchup}</div>
+        <div class="bet-detail">${b.sport} · ${b.pick} · ${new Date(b.placedAt).toLocaleDateString()}</div>
+        <div class="bet-row">
+          <div class="bet-amount">$${b.stake.toFixed(2)}</div>
+          <div style="color:${pc};font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:600">${ps}</div>
+        </div></div>`;
+    }).join('');
+}
+
+function sideTab(tab){
+  document.getElementById('viewOpen').classList.toggle('hidden',tab!=='open');
+  document.getElementById('viewHistory').classList.toggle('hidden',tab!=='history');
+  document.getElementById('tabOpen').classList.toggle('on',tab==='open');
+  document.getElementById('tabHistory').classList.toggle('on',tab==='history');
+}
+
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}
+
+load();
+if(S.initialized){
+  document.getElementById('setup').style.display='none';
+  document.getElementById('app').style.display='grid';
+  renderSidebar();greet();
+}
+</script>
+</body>
+</html>
