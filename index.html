@@ -584,7 +584,6 @@ RULES:
     .slice(-12)
     .map(m => ({role: m.role, content: m.content}));
 
-  addTyping();
   try {
     const resp = await fetch('/api/chat', {
       method:'POST',
