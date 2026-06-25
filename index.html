@@ -537,14 +537,15 @@ RULES:
     if (data.error) { removeTyping(); addMsg('ai',`Error: ${data.error.message}`,''); return; }
     const raw = data.choices[0].message.content;
     removeTyping();
-    const bcMatch = raw.match(/BETCARD:(\{[^\n]+\})/);
+    // Match BETCARD anywhere in the response, including inline or after newline
+    const bcMatch = raw.match(/BETCARD:\s*(\{[\s\S]*?\})/);
     if (bcMatch) {
       try {
         const bc = JSON.parse(bcMatch[1]);
         const sr = calcStake(bc.prob, bc.suggestedOdds||2.0);
         S.pendingBet = {...bc, stake:sr.stake, stakeResult:sr, id:Date.now().toString()};
         save();
-        const cleanText = raw.replace(/BETCARD:[^\n]+/,'').trim();
+        const cleanText = raw.replace(/BETCARD:\s*\{[\s\S]*?\}/, '').trim();
         addMsg('ai', mdToHtml(cleanText)+buildBetCard(bc,sr), raw);
       } catch(e) { addMsg('ai', mdToHtml(raw), raw); }
     } else {
