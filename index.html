@@ -14,7 +14,7 @@
 }
 html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt)}
 
-/* ── SETUP ── */
+/* SETUP */
 .setup{position:fixed;inset:0;background:rgba(0,0,0,.95);display:flex;align-items:center;justify-content:center;z-index:300;padding:20px;overflow-y:auto}
 .setup-box{background:var(--card);border:1px solid var(--border2);border-radius:20px;padding:32px;max-width:380px;width:100%}
 .setup-logo{font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:700;color:var(--teal);letter-spacing:2px;margin-bottom:4px}
@@ -30,35 +30,22 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:
 .risk-desc{font-size:10px;color:var(--muted);line-height:1.3}
 .setup-btn{width:100%;background:var(--teal);color:#080C16;border:none;border-radius:10px;padding:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif}
 
-/* ── DESKTOP LAYOUT ── */
+/* LAYOUT */
 .app{display:none;height:100vh;overflow:hidden}
-@media(min-width:769px){
-  .app{display:grid;grid-template-columns:1fr 320px;grid-template-rows:100vh}
-  .mobile-nav{display:none}
-  .desktop-sidebar{display:flex;flex-direction:column}
-}
+@media(min-width:769px){.app{display:grid;grid-template-columns:1fr 320px}.mobile-nav{display:none}.desktop-sidebar{display:flex!important;flex-direction:column}}
+@media(max-width:768px){.app{display:flex;flex-direction:column}.desktop-sidebar{display:none!important}.mobile-nav{display:flex}.chat-panel{flex:1;min-height:0}}
 
-/* ── MOBILE LAYOUT ── */
-@media(max-width:768px){
-  .app{display:flex;flex-direction:column;height:100vh}
-  .desktop-sidebar{display:none}
-  .chat-panel{flex:1;min-height:0}
-  .mobile-nav{display:flex}
-}
-
-/* ── CHAT PANEL ── */
+/* CHAT */
 .chat-panel{display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--border)}
-.chat-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;background:var(--surface)}
+.chat-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;background:var(--surface)}
 .chat-logo{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:var(--teal);letter-spacing:1px;flex-shrink:0}
 .sport-tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:1}
 .sport-tabs::-webkit-scrollbar{display:none}
 .sport-pill{padding:5px 10px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;white-space:nowrap;font-family:'Inter',sans-serif;transition:all .15s;flex-shrink:0}
 .sport-pill.on{background:var(--teal);color:#080C16;border-color:var(--teal);font-weight:600}
-
 .messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch}
 .messages::-webkit-scrollbar{width:3px}
 .messages::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
-
 .msg{max-width:88%;display:flex;flex-direction:column;gap:3px}
 .msg.user{align-self:flex-end}
 .msg.ai{align-self:flex-start}
@@ -101,7 +88,7 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:
 .send-btn{width:42px;height:42px;border-radius:50%;background:var(--teal);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .send-btn svg{width:16px;height:16px;fill:#080C16}
 
-/* ── DESKTOP SIDEBAR ── */
+/* DESKTOP SIDEBAR */
 .desktop-sidebar{background:var(--surface);border-left:1px solid var(--border);overflow:hidden}
 .bankroll-section{padding:18px;border-bottom:1px solid var(--border)}
 .br-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
@@ -126,6 +113,7 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:
 .bet-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:11px;margin-bottom:8px;border-left:3px solid var(--amber)}
 .bet-item.won{border-left-color:var(--green)}
 .bet-item.lost{border-left-color:var(--red)}
+.bet-item.pushed{border-left-color:var(--muted)}
 .bi-matchup{font-size:13px;font-weight:600;margin-bottom:3px}
 .bi-detail{font-size:11px;color:var(--muted);margin-bottom:7px}
 .bi-row{display:flex;justify-content:space-between;align-items:center}
@@ -136,27 +124,22 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:
 .s-btn.l{background:rgba(255,71,87,.15);color:var(--red)}
 .s-btn.p{background:var(--dim);color:var(--muted)}
 .empty-bets{text-align:center;padding:28px 10px;color:var(--muted);font-size:13px;line-height:1.6}
+.clear-btn{width:100%;padding:9px;border-radius:8px;border:1px solid rgba(255,71,87,.3);background:rgba(255,71,87,.08);color:var(--red);font-size:12px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;margin-top:8px}
+.clear-btn:hover{background:rgba(255,71,87,.15)}
 
-/* ── MOBILE BOTTOM NAV ── */
+/* MOBILE NAV */
 .mobile-nav{display:none;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
 .mobile-nav-tabs{display:flex}
 .mnav-btn{flex:1;padding:10px 4px;border:none;background:transparent;color:var(--muted);font-size:10px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif;display:flex;flex-direction:column;align-items:center;gap:3px;border-top:2px solid transparent}
 .mnav-btn.on{color:var(--teal);border-top-color:var(--teal)}
 .mnav-icon{font-size:18px;line-height:1}
-
-/* ── MOBILE PANELS ── */
 .mobile-panel{display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden}
 .mobile-panel.active{display:flex}
 
-/* MOBILE BANKROLL */
-.mobile-bankroll{padding:16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
-.mbr-row{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
-.mbr-num{font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:700;color:var(--teal);line-height:1}
-.mbr-growth{font-size:12px;font-weight:600}
-.mbr-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
-.mbr-stat{background:var(--card);border-radius:8px;padding:8px 4px;text-align:center}
-.mbr-val{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:600}
-.mbr-lbl{font-size:9px;color:var(--muted);margin-top:1px;text-transform:uppercase}
+.auto-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.auto-badge.won{background:rgba(46,213,115,.15);color:var(--green)}
+.auto-badge.lost{background:rgba(255,71,87,.15);color:var(--red)}
+.auto-badge.pushed{background:var(--dim);color:var(--muted)}
 
 .hidden{display:none!important}
 </style>
@@ -167,23 +150,14 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:
 <div class="setup" id="setup">
   <div class="setup-box">
     <div class="setup-logo">BETPILOT</div>
-    <div class="setup-sub">AI sports betting advisor for NFL, NBA, NHL, MLB &amp; Soccer. Tells you who to bet on and how much — you just say yes or no.</div>
+    <div class="setup-sub">AI sports betting advisor for NFL, NBA, NHL, MLB &amp; World Cup. Tells you who to bet on and how much — you just say yes or no.</div>
     <label class="setup-label">Your starting bankroll ($)</label>
     <input class="setup-input" type="number" id="setupBankroll" value="100" min="10" inputmode="decimal">
     <label class="setup-label">Risk profile</label>
     <div class="risk-row">
-      <div class="risk-opt" data-r="conservative" onclick="pickRisk(this)">
-        <span class="risk-name">Safe</span>
-        <span class="risk-desc">Max 3% per bet</span>
-      </div>
-      <div class="risk-opt on" data-r="moderate" onclick="pickRisk(this)">
-        <span class="risk-name">Moderate</span>
-        <span class="risk-desc">Max 5% per bet</span>
-      </div>
-      <div class="risk-opt" data-r="aggressive" onclick="pickRisk(this)">
-        <span class="risk-name">Bold</span>
-        <span class="risk-desc">Max 8% per bet</span>
-      </div>
+      <div class="risk-opt" data-r="conservative" onclick="pickRisk(this)"><span class="risk-name">Safe</span><span class="risk-desc">Max 3% per bet</span></div>
+      <div class="risk-opt on" data-r="moderate" onclick="pickRisk(this)"><span class="risk-name">Moderate</span><span class="risk-desc">Max 5% per bet</span></div>
+      <div class="risk-opt" data-r="aggressive" onclick="pickRisk(this)"><span class="risk-name">Bold</span><span class="risk-desc">Max 8% per bet</span></div>
     </div>
     <button class="setup-btn" onclick="startApp()">Let's go →</button>
   </div>
@@ -191,8 +165,6 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:
 
 <!-- APP -->
 <div class="app" id="app">
-
-  <!-- CHAT PANEL (shared desktop + mobile) -->
   <div class="chat-panel" id="chatPanel">
     <div class="chat-header">
       <div class="chat-logo">BETPILOT</div>
@@ -201,7 +173,7 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:
         <button class="sport-pill" data-s="NBA" onclick="setSport(this)">🏀 NBA</button>
         <button class="sport-pill" data-s="NHL" onclick="setSport(this)">🏒 NHL</button>
         <button class="sport-pill" data-s="MLB" onclick="setSport(this)">⚾ MLB</button>
-        <button class="sport-pill" data-s="Soccer" onclick="setSport(this)">⚽ Soccer</button>
+        <button class="sport-pill" data-s="World Cup" onclick="setSport(this)">⚽ World Cup</button>
       </div>
     </div>
     <div class="messages" id="messages"></div>
@@ -222,12 +194,9 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:
   </div>
 
   <!-- DESKTOP SIDEBAR -->
-  <div class="desktop-sidebar" style="display:flex;flex-direction:column;overflow:hidden">
+  <div class="desktop-sidebar" id="desktopSidebar">
     <div class="bankroll-section">
-      <div class="br-top">
-        <span class="br-label">Bankroll</span>
-        <button class="settings-btn" onclick="openSetup()">⚙</button>
-      </div>
+      <div class="br-top"><span class="br-label">Bankroll</span><button class="settings-btn" onclick="openSetup()">⚙</button></div>
       <div class="br-num" id="brNum">$0</div>
       <div class="br-growth" id="brGrowth"></div>
       <div class="meter-track"><div class="meter-fill" id="brMeter" style="width:100%"></div></div>
@@ -241,223 +210,295 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:
     <div class="bets-scroll hidden" id="dViewHistory"></div>
   </div>
 
-  <!-- MOBILE BOTTOM NAV -->
+  <!-- MOBILE NAV -->
   <div class="mobile-nav">
     <div class="mobile-nav-tabs">
-      <button class="mnav-btn on" id="mnavChat" onclick="mobileTab('chat')">
-        <span class="mnav-icon">💬</span>Chat
-      </button>
-      <button class="mnav-btn" id="mnavBankroll" onclick="mobileTab('bankroll')">
-        <span class="mnav-icon">💰</span>Bankroll
-      </button>
-      <button class="mnav-btn" id="mnavBets" onclick="mobileTab('bets')">
-        <span class="mnav-icon">📋</span>Bets
-      </button>
-      <button class="mnav-btn" id="mnavHistory" onclick="mobileTab('history')">
-        <span class="mnav-icon">📊</span>History
-      </button>
+      <button class="mnav-btn on" id="mnavChat" onclick="mobileTab('chat')"><span class="mnav-icon">💬</span>Chat</button>
+      <button class="mnav-btn" id="mnavBankroll" onclick="mobileTab('bankroll')"><span class="mnav-icon">💰</span>Bankroll</button>
+      <button class="mnav-btn" id="mnavBets" onclick="mobileTab('bets')"><span class="mnav-icon">📋</span>Bets</button>
+      <button class="mnav-btn" id="mnavHistory" onclick="mobileTab('history')"><span class="mnav-icon">📊</span>History</button>
     </div>
   </div>
-
 </div>
 
 <script>
-const PROFILES={
+/* ── ESPN API ── */
+const ESPN = {
+  NFL:      'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard',
+  NBA:      'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',
+  NHL:      'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard',
+  MLB:      'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard',
+  'World Cup': 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard'
+};
+
+async function fetchSchedule(sport) {
+  try {
+    const r = await fetch(ESPN[sport]);
+    const d = await r.json();
+    const events = d.events || [];
+    if (!events.length) return `No ${sport} games scheduled today.`;
+    return events.map(e => {
+      const comps = e.competitions[0];
+      const home = comps.competitors.find(c => c.homeAway === 'home');
+      const away = comps.competitors.find(c => c.homeAway === 'away');
+      const status = e.status.type.description;
+      const time = status === 'Scheduled'
+        ? new Date(e.date).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+        : status;
+      const score = status !== 'Scheduled'
+        ? ` (${away.team.abbreviation} ${away.score} - ${home.score} ${home.team.abbreviation})`
+        : '';
+      return `${away.team.displayName} @ ${home.team.displayName} — ${time}${score}`;
+    }).join('\n');
+  } catch(e) {
+    return `Could not load ${sport} schedule right now.`;
+  }
+}
+
+async function checkAndAutoSettle() {
+  const openBets = S.bets.filter(b => b.status === 'open');
+  if (!openBets.length) return;
+
+  for (const sport of [...new Set(openBets.map(b => b.sport))]) {
+    try {
+      const r = await fetch(ESPN[sport] || ESPN['NFL']);
+      const d = await r.json();
+      const events = d.events || [];
+
+      for (const event of events) {
+        const comp = event.competitions[0];
+        const statusName = event.status.type.name; // STATUS_FINAL, STATUS_IN_PROGRESS etc
+        if (!statusName.includes('FINAL')) continue;
+
+        const home = comp.competitors.find(c => c.homeAway === 'home');
+        const away = comp.competitors.find(c => c.homeAway === 'away');
+        const homeScore = parseFloat(home.score || 0);
+        const awayScore = parseFloat(away.score || 0);
+        const homeName = home.team.displayName;
+        const awayName = away.team.displayName;
+
+        for (const bet of openBets.filter(b => b.sport === sport)) {
+          const matchup = bet.matchup.toLowerCase();
+          const isThisGame =
+            matchup.includes(homeName.toLowerCase().split(' ').pop()) ||
+            matchup.includes(awayName.toLowerCase().split(' ').pop());
+          if (!isThisGame) continue;
+
+          const pickLower = bet.pick.toLowerCase();
+          const pickIsHome = homeName.toLowerCase().includes(pickLower.split(' ').pop());
+          const pickIsAway = awayName.toLowerCase().includes(pickLower.split(' ').pop());
+
+          let result;
+          if (homeScore === awayScore) result = 'pushed';
+          else if (pickIsHome && homeScore > awayScore) result = 'won';
+          else if (pickIsAway && awayScore > homeScore) result = 'won';
+          else result = 'lost';
+
+          autoSettle(bet.id, result, homeName, awayName, homeScore, awayScore);
+        }
+      }
+    } catch(e) { /* silently skip */ }
+  }
+}
+
+function autoSettle(id, result, home, away, homeScore, awayScore) {
+  const b = S.bets.find(x => x.id === id);
+  if (!b || b.status !== 'open') return;
+  b.status = result;
+  b.settledAt = new Date().toISOString();
+  b.autoSettled = true;
+  b.finalScore = `${away} ${awayScore} - ${homeScore} ${home}`;
+  if (result === 'won') {
+    b.pnl = Math.round((b.stake * b.odds - b.stake) * 100) / 100;
+    S.bankroll = Math.round((S.bankroll + b.stake * b.odds) * 100) / 100;
+  } else if (result === 'pushed') {
+    b.pnl = 0;
+    S.bankroll = Math.round((S.bankroll + b.stake) * 100) / 100;
+  } else {
+    b.pnl = -b.stake;
+  }
+  save();
+  renderSidebar();
+
+  // notify in chat
+  const emoji = result === 'won' ? '🟢' : result === 'lost' ? '🔴' : '⚪';
+  const msg = `${emoji} **Auto-settled:** ${b.matchup}\nPick: **${b.pick}** — **${result.toUpperCase()}**\nFinal score: ${b.finalScore}\nP&L: **${b.pnl >= 0 ? '+' : ''}$${b.pnl.toFixed(2)}**`;
+  addMsg('ai', mdToHtml(msg), msg);
+}
+
+/* ── STATE ── */
+const PROFILES = {
   conservative:{kf:.15,maxS:.03,maxE:.20,minEdge:.05,label:'Safe'},
   moderate:{kf:.25,maxS:.05,maxE:.30,minEdge:.03,label:'Moderate'},
   aggressive:{kf:.40,maxS:.08,maxE:.40,minEdge:.02,label:'Bold'}
 };
 
-let S={bankroll:100,start:100,risk:'moderate',sport:'NFL',bets:[],pendingBet:null,chatHistory:[],initialized:false};
-function save(){localStorage.setItem('bp5',JSON.stringify(S))}
-function load(){try{const d=localStorage.getItem('bp5');if(d)S={...S,...JSON.parse(d)}}catch(e){}}
+const SPORTS = ['NFL','NBA','NHL','MLB','World Cup'];
 
-function pickRisk(el){document.querySelectorAll('.risk-opt').forEach(x=>x.classList.remove('on'));el.classList.add('on')}
+// Per-sport chat histories
+let sportChats = {};
+SPORTS.forEach(s => sportChats[s] = []);
 
-function startApp(){
-  const br=parseFloat(document.getElementById('setupBankroll').value);
-  if(!br||br<10){alert('Enter at least $10');return}
-  const risk=document.querySelector('.risk-opt.on')?.dataset.r||'moderate';
-  const isNew=!S.initialized;
-  if(isNew){S.bankroll=br;S.start=br;S.bets=[];S.chatHistory=[]}
-  S.risk=risk;S.initialized=true;
+let S = {
+  bankroll:100, start:100, risk:'moderate', sport:'NFL',
+  bets:[], pendingBet:null, initialized:false
+};
+
+function save() {
+  localStorage.setItem('bp6', JSON.stringify(S));
+  localStorage.setItem('bp6_chats', JSON.stringify(sportChats));
+}
+function load() {
+  try {
+    const d = localStorage.getItem('bp6');
+    if (d) S = {...S, ...JSON.parse(d)};
+    const c = localStorage.getItem('bp6_chats');
+    if (c) sportChats = JSON.parse(c);
+  } catch(e) {}
+}
+
+function pickRisk(el) {
+  document.querySelectorAll('.risk-opt').forEach(x => x.classList.remove('on'));
+  el.classList.add('on');
+}
+
+function startApp() {
+  const br = parseFloat(document.getElementById('setupBankroll').value);
+  if (!br || br < 10) { alert('Enter at least $10'); return; }
+  const risk = document.querySelector('.risk-opt.on')?.dataset.r || 'moderate';
+  const isNew = !S.initialized;
+  if (isNew) { S.bankroll = br; S.start = br; S.bets = []; sportChats = {}; SPORTS.forEach(s => sportChats[s] = []); }
+  S.risk = risk; S.initialized = true;
   save();
-  document.getElementById('setup').style.display='none';
-  document.getElementById('app').style.display='';
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('app').style.display = '';
   renderSidebar();
-  if(isNew)greet();
+  if (isNew) greet();
+  else loadSportChat(S.sport);
+  // start auto-settle polling every 2 minutes
+  setInterval(checkAndAutoSettle, 120000);
+  checkAndAutoSettle();
 }
 
-function openSetup(){
-  document.getElementById('setupBankroll').value=S.start;
-  document.querySelectorAll('.risk-opt').forEach(x=>x.classList.toggle('on',x.dataset.r===S.risk));
-  document.getElementById('setup').style.display='flex';
+function openSetup() {
+  document.getElementById('setupBankroll').value = S.start;
+  document.querySelectorAll('.risk-opt').forEach(x => x.classList.toggle('on', x.dataset.r === S.risk));
+  document.getElementById('setup').style.display = 'flex';
 }
 
-function setSport(el){
-  document.querySelectorAll('.sport-pill').forEach(x=>x.classList.remove('on'));
-  el.classList.add('on');S.sport=el.dataset.s;save();
+/* ── SPORT SWITCHING ── */
+function setSport(el) {
+  saveSportChat();
+  document.querySelectorAll('.sport-pill').forEach(x => x.classList.remove('on'));
+  el.classList.add('on');
+  S.sport = el.dataset.s;
+  save();
+  loadSportChat(S.sport);
 }
 
-/* MOBILE TAB SWITCHING */
-function mobileTab(tab){
-  const isMobile=window.innerWidth<=768;
-  if(!isMobile)return;
+function saveSportChat() {
+  // save current DOM messages to sportChats
+  const msgs = document.getElementById('messages');
+  sportChats[S.sport] = sportChats[S.sport] || [];
+  // already tracked via addMsg — nothing extra needed
+}
 
-  // update nav buttons
-  ['chat','bankroll','bets','history'].forEach(t=>{
-    document.getElementById('mnav'+t.charAt(0).toUpperCase()+t.slice(1))?.classList.toggle('on',t===tab);
-  });
-
-  const chatPanel=document.getElementById('chatPanel');
-
-  // remove any existing mobile panels
-  document.querySelectorAll('.mobile-panel').forEach(p=>p.remove());
-
-  if(tab==='chat'){
-    chatPanel.style.display='flex';
-    return;
+function loadSportChat(sport) {
+  const msgs = document.getElementById('messages');
+  msgs.innerHTML = '';
+  const history = sportChats[sport] || [];
+  if (history.length === 0) {
+    greet();
+  } else {
+    history.forEach(m => {
+      const div = document.createElement('div');
+      div.className = `msg ${m.role === 'user' ? 'user' : 'ai'}`;
+      div.innerHTML = `<div class="msg-bubble">${m.role === 'user' ? escHtml(m.content) : mdToHtml(m.content)}</div><div class="msg-time">${m.time || ''}</div>`;
+      msgs.appendChild(div);
+    });
+    msgs.scrollTop = msgs.scrollHeight;
   }
-
-  chatPanel.style.display='none';
-  const panel=document.createElement('div');
-  panel.className='mobile-panel active';
-
-  if(tab==='bankroll'){
-    const open=S.bets.filter(b=>b.status==='open');
-    const settled=S.bets.filter(b=>b.status!=='open');
-    const pnl=settled.reduce((s,b)=>s+(b.pnl||0),0);
-    const wins=settled.filter(b=>b.status==='won').length;
-    const exp=open.reduce((s,b)=>s+b.stake,0);
-    const totalStaked=settled.reduce((s,b)=>s+b.stake,0);
-    const roi=totalStaked>0?(pnl/totalStaked*100):0;
-    const growth=((S.bankroll-S.start)/S.start*100);
-    const gc=growth>=0?'var(--green)':'var(--red)';
-    const pct=Math.min((S.bankroll/S.start)*100,100);
-    const fillClass=pct<50?'crit':pct<75?'warn':'';
-    panel.innerHTML=`
-      <div style="padding:20px;overflow-y:auto;flex:1">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Bankroll</span>
-          <button onclick="openSetup()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">⚙</button>
-        </div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:700;color:var(--teal);line-height:1">$${S.bankroll.toFixed(2)}</div>
-        <div style="font-size:13px;font-weight:600;color:${gc};margin-bottom:10px">${growth>=0?'+':''}${growth.toFixed(1)}% from start</div>
-        <div class="meter-track"><div class="meter-fill ${fillClass}" style="width:${Math.max(pct,2)}%"></div></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
-          <div class="stat-box"><div class="stat-val" style="color:var(--amber)">$${exp.toFixed(2)}</div><div class="stat-lbl">Exposure</div></div>
-          <div class="stat-box"><div class="stat-val" style="color:${roi>=0?'var(--green)':'var(--red)'}">${roi>=0?'+':''}${roi.toFixed(1)}%</div><div class="stat-lbl">ROI</div></div>
-          <div class="stat-box"><div class="stat-val">${wins}/${settled.length}</div><div class="stat-lbl">W/Settled</div></div>
-          <div class="stat-box"><div class="stat-val" style="color:${pnl>=0?'var(--green)':'var(--red)'}">${pnl>=0?'+':''}$${pnl.toFixed(2)}</div><div class="stat-lbl">P&L</div></div>
-          <div class="stat-box"><div class="stat-val">$${S.start.toFixed(2)}</div><div class="stat-lbl">Started</div></div>
-          <div class="stat-box"><div class="stat-val">${PROFILES[S.risk].label}</div><div class="stat-lbl">Profile</div></div>
-        </div>
-      </div>`;
-  } else if(tab==='bets'){
-    const open=S.bets.filter(b=>b.status==='open');
-    panel.innerHTML=`<div style="padding:16px;overflow-y:auto;flex:1">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px">${open.length} open bets</div>
-      ${open.length===0?'<div class="empty-bets">No open bets.<br>Ask BetPilot for a pick!</div>':
-        open.map(b=>`<div class="bet-item">
-          <div class="bi-matchup">${b.matchup}</div>
-          <div class="bi-detail">${b.sport} · ${b.pick} · ${b.market} · @${b.odds.toFixed(2)}</div>
-          <div class="bi-row">
-            <div class="bi-amt">$${b.stake.toFixed(2)}<span style="font-size:11px;color:var(--muted)"> → $${(b.stake*b.odds).toFixed(2)}</span></div>
-            <div class="settle-btns">
-              <button class="s-btn w" onclick="settleBet('${b.id}','won');mobileTab('bets')">Won</button>
-              <button class="s-btn l" onclick="settleBet('${b.id}','lost');mobileTab('bets')">Lost</button>
-              <button class="s-btn p" onclick="settleBet('${b.id}','pushed');mobileTab('bets')">Push</button>
-            </div>
-          </div></div>`).join('')}
-    </div>`;
-  } else if(tab==='history'){
-    const hist=[...S.bets].filter(b=>b.status!=='open').reverse();
-    panel.innerHTML=`<div style="padding:16px;overflow-y:auto;flex:1">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px">Settled bets</div>
-      ${hist.length===0?'<div class="empty-bets">No settled bets yet.</div>':
-        hist.map(b=>{
-          const pc=b.pnl>0?'var(--green)':b.pnl<0?'var(--red)':'var(--muted)';
-          const ps=b.pnl!=null?(b.pnl>=0?'+':'')+`$${Math.abs(b.pnl).toFixed(2)}`:'';
-          return`<div class="bet-item ${b.status}">
-            <div class="bi-matchup">${b.matchup}</div>
-            <div class="bi-detail">${b.sport} · ${b.pick} · ${new Date(b.placedAt).toLocaleDateString()}</div>
-            <div class="bi-row">
-              <div class="bi-amt">$${b.stake.toFixed(2)}</div>
-              <div style="color:${pc};font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:600">${ps}</div>
-            </div></div>`;
-        }).join('')}
-    </div>`;
-  }
-
-  // insert before mobile-nav
-  const nav=document.querySelector('.mobile-nav');
-  document.getElementById('app').insertBefore(panel,nav);
 }
 
-/* MATH */
-function kelly(p,odds){const b=odds-1;if(b<=0)return 0;return Math.max((b*p-(1-p))/b,0)}
-function calcStake(p,odds){
-  const prof=PROFILES[S.risk];
-  const openExp=S.bets.filter(b=>b.status==='open').reduce((s,b)=>s+b.stake,0);
-  const imp=1/odds;const edge=p-imp;const ev=p*(odds-1)-(1-p);
-  if(edge<prof.minEdge)return{stake:0,edge,ev,imp,reason:`Edge ${(edge*100).toFixed(1)}% below ${(prof.minEdge*100).toFixed(0)}% minimum`};
-  const fk=kelly(p,odds);
-  if(fk<=0)return{stake:0,edge,ev,imp,reason:'No edge — pass'};
-  const frac=Math.min(fk*prof.kf,prof.maxS);
-  const room=Math.max(S.bankroll*prof.maxE-openExp,0);
-  const stake=Math.min(S.bankroll*frac,room);
-  if(stake<=0)return{stake:0,edge,ev,imp,reason:'Exposure cap reached'};
-  return{stake:Math.round(stake*100)/100,edge,ev,imp,fkPct:(fk*100).toFixed(1),usedPct:((stake/S.bankroll)*100).toFixed(1),reason:''};
+/* ── MATH ── */
+function kelly(p, odds) { const b=odds-1; if(b<=0)return 0; return Math.max((b*p-(1-p))/b,0); }
+function calcStake(p, odds) {
+  const prof = PROFILES[S.risk];
+  const openExp = S.bets.filter(b=>b.status==='open').reduce((s,b)=>s+b.stake,0);
+  const imp=1/odds, edge=p-imp, ev=p*(odds-1)-(1-p);
+  if (edge < prof.minEdge) return {stake:0,edge,ev,imp,reason:`Edge ${(edge*100).toFixed(1)}% below ${(prof.minEdge*100).toFixed(0)}% minimum`};
+  const fk = kelly(p,odds);
+  if (fk<=0) return {stake:0,edge,ev,imp,reason:'No edge — pass'};
+  const frac = Math.min(fk*prof.kf, prof.maxS);
+  const room = Math.max(S.bankroll*prof.maxE - openExp, 0);
+  const stake = Math.min(S.bankroll*frac, room);
+  if (stake<=0) return {stake:0,edge,ev,imp,reason:'Exposure cap reached'};
+  return {stake:Math.round(stake*100)/100, edge, ev, imp, fkPct:(fk*100).toFixed(1), usedPct:((stake/S.bankroll)*100).toFixed(1), reason:''};
 }
 
-/* CHAT */
-function addMsg(role,html,raw){
-  const msgs=document.getElementById('messages');
-  const div=document.createElement('div');div.className=`msg ${role}`;
-  const time=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-  div.innerHTML=`<div class="msg-bubble">${html}</div><div class="msg-time">${time}</div>`;
-  msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
-  if(raw&&role==='ai')S.chatHistory.push({role:'assistant',content:raw});
+/* ── CHAT ── */
+function addMsg(role, html, raw) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  const time = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  div.innerHTML = `<div class="msg-bubble">${html}</div><div class="msg-time">${time}</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  // save to sport chat history
+  if (!sportChats[S.sport]) sportChats[S.sport] = [];
+  sportChats[S.sport].push({role: role==='user'?'user':'assistant', content: raw||html, time});
+  // trim to last 30 messages per sport
+  if (sportChats[S.sport].length > 30) sportChats[S.sport] = sportChats[S.sport].slice(-30);
+  save();
 }
-function addTyping(){
-  const msgs=document.getElementById('messages');
-  const div=document.createElement('div');div.className='typing';div.id='typing';
+
+function addTyping() {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className='typing'; div.id='typing';
   div.innerHTML='<span></span><span></span><span></span>';
-  msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
+  msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
 }
-function removeTyping(){document.getElementById('typing')?.remove()}
+function removeTyping() { document.getElementById('typing')?.remove(); }
 
-function greet(){
-  const p=PROFILES[S.risk];
-  const txt=`Hey! I'm BetPilot 👋\n\nYou're set up with **$${S.start.toFixed(2)}** on **${p.label}** mode.\n\nTell me what sport you want to bet on and I'll pull today's schedule, analyze the matchups, and tell you exactly who to back and how much to stake. Just say yes or no.\n\nWhat are we betting on today?`;
-  addMsg('ai',mdToHtml(txt),txt);
+function greet() {
+  const p = PROFILES[S.risk];
+  const sportEmojis = {NFL:'🏈',NBA:'🏀',NHL:'🏒',MLB:'⚾','World Cup':'⚽'};
+  const txt = `Hey! I'm BetPilot ${sportEmojis[S.sport]||'👋'}\n\nYou're set up with **$${S.start.toFixed(2)}** on **${p.label}** mode.\n\nI'll pull today's real ${S.sport} schedule, analyze the matchups, and tell you exactly who to back and how much. Just say yes or no — I handle everything else.\n\nWhat do you want to do?`;
+  addMsg('ai', mdToHtml(txt), txt);
 }
 
-function mdToHtml(s){
+function mdToHtml(s) {
   return s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/\n\n/g,'</p><p style="margin-top:8px">').replace(/\n/g,'<br>');
 }
 
-async function sendMsg(){
-  const inp=document.getElementById('chatInput');
-  const msg=inp.value.trim();if(!msg)return;
-  inp.value='';
-  // switch to chat tab on mobile
-  if(window.innerWidth<=768)mobileTab('chat');
-  addMsg('user',escHtml(msg));
-  S.chatHistory.push({role:'user',content:msg});
-  await callAI();
+async function sendMsg() {
+  const inp = document.getElementById('chatInput');
+  const msg = inp.value.trim(); if(!msg) return;
+  inp.value = '';
+  if (window.innerWidth <= 768) mobileTab('chat');
+  addMsg('user', escHtml(msg), msg);
+  await callAI(msg);
 }
-function quickSend(msg){document.getElementById('chatInput').value=msg;sendMsg()}
+function quickSend(msg) { document.getElementById('chatInput').value = msg; sendMsg(); }
 
-async function callAI(){
-  const p=PROFILES[S.risk];
-  const openBets=S.bets.filter(b=>b.status==='open');
-  const settled=S.bets.filter(b=>b.status!=='open');
-  const pnl=settled.reduce((s,b)=>s+(b.pnl||0),0);
-  const totalStaked=settled.reduce((s,b)=>s+b.stake,0);
-  const roi=totalStaked>0?(pnl/totalStaked*100):0;
+async function callAI(userMsg) {
+  const p = PROFILES[S.risk];
+  const openBets = S.bets.filter(b=>b.status==='open');
+  const settled = S.bets.filter(b=>b.status!=='open');
+  const pnl = settled.reduce((s,b)=>s+(b.pnl||0),0);
+  const totalStaked = settled.reduce((s,b)=>s+b.stake,0);
+  const roi = totalStaked>0?(pnl/totalStaked*100):0;
 
-  const system=`You are BetPilot, an expert AI sports betting advisor. Be direct and confident.
+  // Fetch real ESPN schedule if user is asking about games/schedule
+  let scheduleContext = '';
+  const scheduleKeywords = ['game','schedule','today','tonight','playing','on today','matchup','fixture'];
+  if (scheduleKeywords.some(k => userMsg.toLowerCase().includes(k))) {
+    scheduleContext = `\n\nREAL ESPN SCHEDULE FOR ${S.sport} TODAY:\n${await fetchSchedule(S.sport)}`;
+  }
+
+  const system = `You are BetPilot, an expert AI sports betting advisor. Be direct and confident.
 
 USER STATE:
 - Sport: ${S.sport} | Date: ${new Date().toDateString()}
@@ -465,57 +506,61 @@ USER STATE:
 - Risk: ${p.label} — max ${(p.maxS*100).toFixed(0)}% per bet, needs ${(p.minEdge*100).toFixed(0)}%+ edge
 - Open bets: ${openBets.length>0?openBets.map(b=>`${b.matchup} $${b.stake} on ${b.pick}`).join(', '):'none'}
 - ROI: ${roi.toFixed(1)}% | P&L: ${pnl>=0?'+':''}$${pnl.toFixed(2)}
+${scheduleContext}
 
 RULES:
-1. When asked about today's schedule: list real games with teams and times for ${S.sport}.
-2. When giving a pick: choose ONE game, give 2-3 sentences of analysis (recent form, injuries, home/away edge), estimate a win probability and suggest decimal odds.
-3. ALWAYS end bet recommendations with this exact line:
+1. Use the real ESPN schedule data above when available. List actual games with real teams and times.
+2. When giving a pick: choose ONE game from the schedule, give 2-3 sentences of real analysis, estimate a win probability and suggest decimal odds.
+3. ALWAYS end bet recommendations with this exact line (no line break inside):
    BETCARD:{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"short reason","prob":0.62,"suggestedOdds":2.10,"market":"Moneyline"}
 4. Max 3 short paragraphs. Use **bold** for key info.
-5. Use your real knowledge of current form and standings. Say "based on recent form" if needed but always give a real pick.`;
+5. Never tell the user to manually settle bets — the app does it automatically via ESPN scores.`;
+
+  const chatHistory = (sportChats[S.sport] || [])
+    .filter(m => m.role === 'user' || m.role === 'assistant')
+    .slice(-12)
+    .map(m => ({role: m.role, content: m.content}));
 
   addTyping();
-  try{
-    const resp=await fetch('/api/chat',{
+  try {
+    const resp = await fetch('/api/chat', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
+      body: JSON.stringify({
         model:'llama-3.3-70b-versatile',
         max_tokens:1000,
         temperature:0.7,
-        messages:[{role:'system',content:system},...S.chatHistory.slice(-12)]
+        messages:[{role:'system',content:system}, ...chatHistory]
       })
     });
-    const data=await resp.json();
-    if(data.error){removeTyping();addMsg('ai',`Error: ${data.error.message}`,'');return}
-    const raw=data.choices[0].message.content;
+    const data = await resp.json();
+    if (data.error) { removeTyping(); addMsg('ai',`Error: ${data.error.message}`,''); return; }
+    const raw = data.choices[0].message.content;
     removeTyping();
-    const bcMatch=raw.match(/BETCARD:(\{[^\n]+\})/);
-    if(bcMatch){
-      try{
-        const bc=JSON.parse(bcMatch[1]);
-        const sr=calcStake(bc.prob,bc.suggestedOdds||2.0);
-        S.pendingBet={...bc,stake:sr.stake,stakeResult:sr,id:Date.now().toString()};
+    const bcMatch = raw.match(/BETCARD:(\{[^\n]+\})/);
+    if (bcMatch) {
+      try {
+        const bc = JSON.parse(bcMatch[1]);
+        const sr = calcStake(bc.prob, bc.suggestedOdds||2.0);
+        S.pendingBet = {...bc, stake:sr.stake, stakeResult:sr, id:Date.now().toString()};
         save();
-        const cleanText=raw.replace(/BETCARD:[^\n]+/,'').trim();
-        addMsg('ai',mdToHtml(cleanText)+buildBetCard(bc,sr),raw);
-      }catch(e){addMsg('ai',mdToHtml(raw),raw)}
-    }else{
-      addMsg('ai',mdToHtml(raw),raw);
+        const cleanText = raw.replace(/BETCARD:[^\n]+/,'').trim();
+        addMsg('ai', mdToHtml(cleanText)+buildBetCard(bc,sr), raw);
+      } catch(e) { addMsg('ai', mdToHtml(raw), raw); }
+    } else {
+      addMsg('ai', mdToHtml(raw), raw);
     }
-    if(S.chatHistory.length>24)S.chatHistory=S.chatHistory.slice(-24);
-    save();
-  }catch(e){
+  } catch(e) {
     removeTyping();
-    addMsg('ai','Connection error — make sure the app is deployed on Vercel.','');
+    addMsg('ai','Connection error — check your Vercel deployment.','');
   }
 }
 
-function buildBetCard(bc,sr){
-  const ec=sr.ev>0?'var(--green)':'var(--red)';
-  const edgec=sr.edge>0?'var(--teal)':'var(--red)';
-  const canBet=sr.stake>0;
-  return`<div class="bet-card">
+function buildBetCard(bc, sr) {
+  const ec = sr.ev>0?'var(--green)':'var(--red)';
+  const edgec = sr.edge>0?'var(--teal)':'var(--red)';
+  const canBet = sr.stake>0;
+  return `<div class="bet-card">
     <div class="bet-card-sport">${bc.sport} · ${bc.market||'Moneyline'}</div>
     <div class="bet-card-matchup">${bc.matchup}</div>
     <div class="bet-card-pick">Pick: <strong style="color:var(--teal)">${bc.pick}</strong> — ${bc.reason}</div>
@@ -525,54 +570,63 @@ function buildBetCard(bc,sr){
       <div class="bet-stat"><div class="bet-stat-val">${(bc.prob*100).toFixed(0)}%</div><div class="bet-stat-lbl">Win prob</div></div>
     </div>
     ${canBet
-      ?`<div style="margin-bottom:10px;font-size:13px;color:var(--muted)">Stake: <strong style="color:var(--txt);font-size:15px">$${sr.stake.toFixed(2)}</strong> <span style="color:var(--muted)">(${sr.usedPct}% of bankroll)</span></div>
+      ? `<div style="margin-bottom:10px;font-size:13px;color:var(--muted)">Stake: <strong style="color:var(--txt);font-size:15px">$${sr.stake.toFixed(2)}</strong> <span style="color:var(--muted)">(${sr.usedPct}% of bankroll)</span></div>
          <div class="bet-actions">
            <button class="bet-btn yes" onclick="logBet()">✓ Log — $${sr.stake.toFixed(2)}</button>
            <button class="bet-btn no" onclick="skipBet()">Skip</button>
          </div>`
-      :`<div style="background:rgba(255,71,87,.08);border:1px solid rgba(255,71,87,.2);border-radius:8px;padding:10px;font-size:13px;color:var(--red)">${sr.reason}</div>`
+      : `<div style="background:rgba(255,71,87,.08);border:1px solid rgba(255,71,87,.2);border-radius:8px;padding:10px;font-size:13px;color:var(--red)">${sr.reason}</div>`
     }
   </div>`;
 }
 
-function logBet(){
-  if(!S.pendingBet)return;
-  const b=S.pendingBet;
-  const bet={id:b.id,sport:b.sport,matchup:b.matchup,pick:b.pick,market:b.market||'Moneyline',stake:b.stake,odds:b.suggestedOdds||2.0,status:'open',placedAt:new Date().toISOString(),pnl:null};
+function logBet() {
+  if (!S.pendingBet) return;
+  const b = S.pendingBet;
+  const bet = {
+    id:b.id, sport:b.sport, matchup:b.matchup, pick:b.pick,
+    market:b.market||'Moneyline', stake:b.stake, odds:b.suggestedOdds||2.0,
+    status:'open', placedAt:new Date().toISOString(), pnl:null
+  };
   S.bets.push(bet);
-  S.bankroll=Math.round((S.bankroll-b.stake)*100)/100;
-  S.pendingBet=null;save();renderSidebar();
-  const msg=`Bet logged ✓\n\n**$${bet.stake.toFixed(2)}** on **${bet.pick}** (${bet.matchup})\nPotential return: **$${(bet.stake*bet.odds).toFixed(2)}**\n\nTracked in your bets tab. Want another pick?`;
-  addMsg('ai',mdToHtml(msg),msg);
+  S.bankroll = Math.round((S.bankroll-b.stake)*100)/100;
+  S.pendingBet = null; save(); renderSidebar();
+  const msg = `Bet logged ✓\n\n**$${bet.stake.toFixed(2)}** on **${bet.pick}** (${bet.matchup})\nPotential return: **$${(bet.stake*bet.odds).toFixed(2)}**\n\n⚡ I'll automatically settle this once the game ends. Want another pick?`;
+  addMsg('ai', mdToHtml(msg), msg);
 }
 
-function skipBet(){
-  S.pendingBet=null;save();
-  addMsg('ai',"Skipped. Want me to look at a different game or sport?",'');
+function skipBet() {
+  S.pendingBet=null; save();
+  addMsg('ai',"Skipped. Want me to look at a different game?",'');
 }
 
-function settleBet(id,result){
-  const b=S.bets.find(x=>x.id===id);if(!b||b.status!=='open')return;
-  b.status=result;b.settledAt=new Date().toISOString();
+function settleBet(id, result) {
+  const b = S.bets.find(x=>x.id===id); if(!b||b.status!=='open') return;
+  b.status=result; b.settledAt=new Date().toISOString();
   if(result==='won'){b.pnl=Math.round((b.stake*b.odds-b.stake)*100)/100;S.bankroll=Math.round((S.bankroll+b.stake*b.odds)*100)/100}
   else if(result==='pushed'){b.pnl=0;S.bankroll=Math.round((S.bankroll+b.stake)*100)/100}
   else{b.pnl=-b.stake}
-  save();renderSidebar();
+  save(); renderSidebar();
 }
 
-function renderSidebar(){
-  const growth=((S.bankroll-S.start)/S.start*100);
-  const gc=growth>=0?'var(--green)':'var(--red)';
-  const pct=Math.min((S.bankroll/S.start)*100,100);
+function clearHistory() {
+  if (!confirm('Delete all settled bet history? This cannot be undone.')) return;
+  S.bets = S.bets.filter(b=>b.status==='open');
+  save(); renderSidebar();
+}
 
-  // desktop sidebar
-  const brNum=document.getElementById('brNum');
-  if(brNum){
-    brNum.textContent=`$${S.bankroll.toFixed(2)}`;
-    document.getElementById('brGrowth').innerHTML=`<span style="color:${gc}">${growth>=0?'+':''}${growth.toFixed(1)}% from start</span>`;
-    const fill=document.getElementById('brMeter');
-    fill.style.width=Math.max(pct,2)+'%';
-    fill.className='meter-fill'+(pct<50?' crit':pct<75?' warn':'');
+/* ── RENDER ── */
+function renderSidebar() {
+  const growth = ((S.bankroll-S.start)/S.start*100);
+  const gc = growth>=0?'var(--green)':'var(--red)';
+  const pct = Math.min((S.bankroll/S.start)*100,100);
+  const brNum = document.getElementById('brNum');
+  if (brNum) {
+    brNum.textContent = `$${S.bankroll.toFixed(2)}`;
+    document.getElementById('brGrowth').innerHTML = `<span style="color:${gc}">${growth>=0?'+':''}${growth.toFixed(1)}% from start</span>`;
+    const fill = document.getElementById('brMeter');
+    fill.style.width = Math.max(pct,2)+'%';
+    fill.className = 'meter-fill'+(pct<50?' crit':pct<75?' warn':'');
     const open=S.bets.filter(b=>b.status==='open');
     const settled=S.bets.filter(b=>b.status!=='open');
     const pnl=settled.reduce((s,b)=>s+(b.pnl||0),0);
@@ -589,51 +643,133 @@ function renderSidebar(){
   }
 }
 
-function renderDesktopBets(){
+function betItemHTML(b, showSettle=false) {
+  const pc = b.pnl>0?'var(--green)':b.pnl<0?'var(--red)':'var(--muted)';
+  const ps = b.pnl!=null?(b.pnl>=0?'+':'')+`$${Math.abs(b.pnl).toFixed(2)}`:'';
+  const autoBadge = b.autoSettled?`<span class="auto-badge ${b.status}">⚡ auto</span>`:'';
+  const score = b.finalScore?`<div style="font-size:10px;color:var(--muted);margin-top:2px">${b.finalScore}</div>`:'';
+  return `<div class="bet-item ${b.status}">
+    <div class="bi-matchup">${b.matchup} ${autoBadge}</div>
+    <div class="bi-detail">${b.sport} · ${b.pick} · ${b.market}${b.status!=='open'?' · '+new Date(b.placedAt).toLocaleDateString():''}</div>
+    ${score}
+    <div class="bi-row" style="margin-top:6px">
+      <div class="bi-amt">$${b.stake.toFixed(2)}${b.status!=='open'?`<span style="font-size:12px;color:${pc};margin-left:6px">${ps}</span>`:''}</div>
+      ${showSettle?`<div class="settle-btns">
+        <button class="s-btn w" onclick="settleBet('${b.id}','won')">Won</button>
+        <button class="s-btn l" onclick="settleBet('${b.id}','lost')">Lost</button>
+        <button class="s-btn p" onclick="settleBet('${b.id}','pushed')">Push</button>
+      </div>`:''}
+    </div>
+  </div>`;
+}
+
+function renderDesktopBets() {
   const open=S.bets.filter(b=>b.status==='open');
   const hist=[...S.bets].filter(b=>b.status!=='open').reverse();
   const dOpen=document.getElementById('dViewOpen');
   const dHist=document.getElementById('dViewHistory');
   if(!dOpen)return;
-  dOpen.innerHTML=open.length===0?'<div class="empty-bets">No open bets.<br>Ask BetPilot for a pick!</div>':
-    open.map(b=>`<div class="bet-item">
-      <div class="bi-matchup">${b.matchup}</div>
-      <div class="bi-detail">${b.sport} · ${b.pick} · ${b.market}</div>
-      <div class="bi-row">
-        <div class="bi-amt">$${b.stake.toFixed(2)}</div>
-        <div class="settle-btns">
-          <button class="s-btn w" onclick="settleBet('${b.id}','won')">Won</button>
-          <button class="s-btn l" onclick="settleBet('${b.id}','lost')">Lost</button>
-          <button class="s-btn p" onclick="settleBet('${b.id}','pushed')">Push</button>
-        </div>
-      </div></div>`).join('');
-  dHist.innerHTML=hist.length===0?'<div class="empty-bets">No history yet.</div>':
-    hist.map(b=>{
-      const pc=b.pnl>0?'var(--green)':b.pnl<0?'var(--red)':'var(--muted)';
-      const ps=b.pnl!=null?(b.pnl>=0?'+':'')+`$${Math.abs(b.pnl).toFixed(2)}`:'';
-      return`<div class="bet-item ${b.status}">
-        <div class="bi-matchup">${b.matchup}</div>
-        <div class="bi-detail">${b.sport} · ${b.pick} · ${new Date(b.placedAt).toLocaleDateString()}</div>
-        <div class="bi-row"><div class="bi-amt">$${b.stake.toFixed(2)}</div>
-        <div style="color:${pc};font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:600">${ps}</div></div>
-      </div>`;
-    }).join('');
+  dOpen.innerHTML = open.length===0
+    ?'<div class="empty-bets">No open bets.<br>Ask BetPilot for a pick!<br><br><small style="color:var(--dim)">⚡ Bets auto-settle via ESPN</small></div>'
+    :open.map(b=>betItemHTML(b,true)).join('');
+  dHist.innerHTML = hist.length===0
+    ?'<div class="empty-bets">No history yet.</div>'
+    :hist.map(b=>betItemHTML(b,false)).join('')
+     +`<button class="clear-btn" onclick="clearHistory()">🗑 Clear history</button>`;
 }
 
-function dSideTab(tab){
+function dSideTab(tab) {
   document.getElementById('dViewOpen').classList.toggle('hidden',tab!=='open');
   document.getElementById('dViewHistory').classList.toggle('hidden',tab!=='history');
   document.getElementById('dTabOpen').classList.toggle('on',tab==='open');
   document.getElementById('dTabHistory').classList.toggle('on',tab==='history');
 }
 
+/* ── MOBILE ── */
+function mobileTab(tab) {
+  if(window.innerWidth>768)return;
+  ['chat','bankroll','bets','history'].forEach(t=>{
+    document.getElementById('mnav'+t.charAt(0).toUpperCase()+t.slice(1))?.classList.toggle('on',t===tab);
+  });
+  const chatPanel=document.getElementById('chatPanel');
+  document.querySelectorAll('.mobile-panel').forEach(p=>p.remove());
+  if(tab==='chat'){chatPanel.style.display='flex';return}
+  chatPanel.style.display='none';
+  const panel=document.createElement('div');
+  panel.className='mobile-panel active';
+
+  if(tab==='bankroll'){
+    const open=S.bets.filter(b=>b.status==='open');
+    const settled=S.bets.filter(b=>b.status!=='open');
+    const pnl=settled.reduce((s,b)=>s+(b.pnl||0),0);
+    const wins=settled.filter(b=>b.status==='won').length;
+    const exp=open.reduce((s,b)=>s+b.stake,0);
+    const totalStaked=settled.reduce((s,b)=>s+b.stake,0);
+    const roi=totalStaked>0?(pnl/totalStaked*100):0;
+    const growth=((S.bankroll-S.start)/S.start*100);
+    const gc=growth>=0?'var(--green)':'var(--red)';
+    const pct=Math.min((S.bankroll/S.start)*100,100);
+    const fc=pct<50?'crit':pct<75?'warn':'';
+    panel.innerHTML=`<div style="padding:20px;overflow-y:auto;flex:1">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Bankroll</span>
+        <button onclick="openSetup()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">⚙</button>
+      </div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:700;color:var(--teal);line-height:1">$${S.bankroll.toFixed(2)}</div>
+      <div style="font-size:13px;font-weight:600;color:${gc};margin-bottom:10px">${growth>=0?'+':''}${growth.toFixed(1)}% from start</div>
+      <div class="meter-track"><div class="meter-fill ${fc}" style="width:${Math.max(pct,2)}%"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
+        <div class="stat-box"><div class="stat-val" style="color:var(--amber)">$${exp.toFixed(2)}</div><div class="stat-lbl">Exposure</div></div>
+        <div class="stat-box"><div class="stat-val" style="color:${roi>=0?'var(--green)':'var(--red)'}">${roi>=0?'+':''}${roi.toFixed(1)}%</div><div class="stat-lbl">ROI</div></div>
+        <div class="stat-box"><div class="stat-val">${wins}/${settled.length}</div><div class="stat-lbl">W/Settled</div></div>
+        <div class="stat-box"><div class="stat-val" style="color:${pnl>=0?'var(--green)':'var(--red)'}">${pnl>=0?'+':''}$${pnl.toFixed(2)}</div><div class="stat-lbl">P&L</div></div>
+      </div>
+      <div style="margin-top:16px;font-size:12px;color:var(--muted);text-align:center">⚡ Bets auto-settle via ESPN scores</div>
+    </div>`;
+  } else if(tab==='bets'){
+    const open=S.bets.filter(b=>b.status==='open');
+    panel.innerHTML=`<div style="padding:16px;overflow-y:auto;flex:1">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px">${open.length} open bets</div>
+      ${open.length===0
+        ?'<div class="empty-bets">No open bets.<br>Ask BetPilot for a pick!<br><br><small style="color:var(--dim)">⚡ Bets auto-settle via ESPN</small></div>'
+        :open.map(b=>`<div class="bet-item">
+          <div class="bi-matchup">${b.matchup}</div>
+          <div class="bi-detail">${b.sport} · ${b.pick} · ${b.market}</div>
+          <div class="bi-row" style="margin-top:6px">
+            <div class="bi-amt">$${b.stake.toFixed(2)}<span style="font-size:11px;color:var(--muted)"> → $${(b.stake*b.odds).toFixed(2)}</span></div>
+            <div class="settle-btns">
+              <button class="s-btn w" onclick="settleBet('${b.id}','won');mobileTab('bets')">Won</button>
+              <button class="s-btn l" onclick="settleBet('${b.id}','lost');mobileTab('bets')">Lost</button>
+              <button class="s-btn p" onclick="settleBet('${b.id}','pushed');mobileTab('bets')">Push</button>
+            </div>
+          </div></div>`).join('')}
+    </div>`;
+  } else if(tab==='history'){
+    const hist=[...S.bets].filter(b=>b.status!=='open').reverse();
+    panel.innerHTML=`<div style="padding:16px;overflow-y:auto;flex:1">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px">Settled bets</div>
+      ${hist.length===0
+        ?'<div class="empty-bets">No settled bets yet.</div>'
+        :hist.map(b=>betItemHTML(b,false)).join('')
+         +'<button class="clear-btn" onclick="clearHistory();mobileTab(\'history\')">🗑 Clear history</button>'}
+    </div>`;
+  }
+
+  const nav=document.querySelector('.mobile-nav');
+  document.getElementById('app').insertBefore(panel,nav);
+}
+
 function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}
 
+/* ── INIT ── */
 load();
 if(S.initialized){
   document.getElementById('setup').style.display='none';
   document.getElementById('app').style.display='';
-  renderSidebar();greet();
+  renderSidebar();
+  loadSportChat(S.sport);
+  setInterval(checkAndAutoSettle,120000);
+  checkAndAutoSettle();
 }
 </script>
 </body>
