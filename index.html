@@ -230,30 +230,87 @@ const ESPN = {
   MLB:      'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard',
   'World Cup': 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard'
 };
-
-async function fetchSchedule(sport) {
-  try {
-    const r = await fetch(ESPN[sport]);
-    const d = await r.json();
-    const events = d.events || [];
-    if (!events.length) return `No ${sport} games scheduled today.`;
-    return events.map(e => {
-      const comps = e.competitions[0];
-      const home = comps.competitors.find(c => c.homeAway === 'home');
-      const away = comps.competitors.find(c => c.homeAway === 'away');
-      const status = e.status.type.description;
-      const time = status === 'Scheduled'
-        ? new Date(e.date).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
-        : status;
-      const score = status !== 'Scheduled'
-        ? ` (${away.team.abbreviation} ${away.score} - ${home.score} ${home.team.abbreviation})`
-        : '';
-      return `${away.team.displayName} @ ${home.team.displayName} — ${time}${score}`;
-    }).join('\n');
-  } catch(e) {
-    return `Could not load ${sport} schedule right now.`;
-  }
+const ESPN_BASE = {
+  NFL:'football/nfl', NBA:'basketball/nba', NHL:'hockey/nhl',
+  MLB:'baseball/mlb', 'World Cup':'soccer/fifa.world'
+};
+function espnUrl(sport, path) {
+  return `https://site.api.espn.com/apis/site/v2/sports/${ESPN_BASE[sport]}/${path}`;
 }
+async function safeJson(url) {
+  try { const r = await fetch(url); return await r.json(); } catch(e) { return null; }
+}
+async function fetchTeamInjuries(sport, teamId) {
+  if (sport === 'World Cup') return '';
+  const d = await safeJson(espnUrl(sport, `teams/${teamId}/injuries`));
+  const items = d?.injuries || [];
+  if (!items.length) return 'None reported';
+  return items.slice(0,4).map(i =>
+    `${i.athlete?.displayName||'?'} (${i.athlete?.position?.abbreviation||'?'}) — ${i.status||'Questionable'}`
+  ).join(', ');
+}
+async function fetchTeamForm(sport, teamId) {
+  const d = await safeJson(espnUrl(sport, `teams/${teamId}/schedule`));
+  const events = d?.events || [];
+  const done = events.filter(e => e.competitions?.[0]?.status?.type?.completed).slice(-5);
+  if (!done.length) return 'No recent data';
+  return done.map(e => {
+    const comp = e.competitions[0];
+    const w = comp.competitors.find(c => c.winner);
+    const l = comp.competitors.find(c => !c.winner);
+    if (!w) return 'Draw';
+    return `${w.team.abbreviation} def ${l.team.abbreviation} ${w.score}-${l.score}`;
+  }).join(' | ');
+}
+async function fetchSchedule(sport) {
+  const d = await safeJson(ESPN[sport]);
+  const events = d?.events || [];
+  if (!events.length) return `No ${sport} games today.`;
+  return events.map(e => {
+    const comp = e.competitions[0];
+    const home = comp.competitors.find(c => c.homeAway === 'home');
+    const away = comp.competitors.find(c => c.homeAway === 'away');
+    const status = e.status.type.description;
+    const time = status === 'Scheduled'
+      ? new Date(e.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
+      : status;
+    const score = status !== 'Scheduled' ? ` (${away.score||0}-${home.score||0})` : '';
+    return `${away.team.displayName} @ ${home.team.displayName} — ${time}${score}`;
+  }).join('\n');
+}
+async function fetchFullScheduleContext(sport) {
+  const d = await safeJson(ESPN[sport]);
+  const events = d?.events || [];
+  if (!events.length) return `No ${sport} games today.`;
+  const lines = [];
+  for (const e of events.slice(0,5)) {
+    const comp = e.competitions[0];
+    const home = comp.competitors.find(c => c.homeAway === 'home');
+    const away = comp.competitors.find(c => c.homeAway === 'away');
+    const status = e.status.type.description;
+    const time = status === 'Scheduled'
+      ? new Date(e.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
+      : status;
+    const score = status !== 'Scheduled' ? ` | Score: ${away.score||0}-${home.score||0}` : '';
+    const homeRec = home.records?.[0]?.summary || '';
+    const awayRec = away.records?.[0]?.summary || '';
+    const [hi, ai, hf, af] = await Promise.all([
+      fetchTeamInjuries(sport, home.team.id),
+      fetchTeamInjuries(sport, away.team.id),
+      fetchTeamForm(sport, home.team.id),
+      fetchTeamForm(sport, away.team.id),
+    ]);
+    lines.push(
+      `GAME: ${away.team.displayName}${awayRec?' ('+awayRec+')':''} @ ${home.team.displayName}${homeRec?' ('+homeRec+')':''} — ${time}${score}\n` +
+      `  Injuries ${home.team.displayName}: ${hi||'None'}\n` +
+      `  Injuries ${away.team.displayName}: ${ai||'None'}\n` +
+      `  Form ${home.team.displayName} (last 5): ${hf}\n` +
+      `  Form ${away.team.displayName} (last 5): ${af}`
+    );
+  }
+  return lines.join('\n\n');
+}
+
 
 async function checkAndAutoSettle() {
   const openBets = S.bets.filter(b => b.status === 'open');
@@ -491,14 +548,16 @@ async function callAI(userMsg) {
   const totalStaked = settled.reduce((s,b)=>s+b.stake,0);
   const roi = totalStaked>0?(pnl/totalStaked*100):0;
 
-  // Fetch real ESPN schedule if user is asking about games/schedule
-  let scheduleContext = '';
-  const scheduleKeywords = ['game','schedule','today','tonight','playing','on today','matchup','fixture'];
-  if (scheduleKeywords.some(k => userMsg.toLowerCase().includes(k))) {
-    scheduleContext = `\n\nREAL ESPN SCHEDULE FOR ${S.sport} TODAY:\n${await fetchSchedule(S.sport)}`;
+  // Always fetch rich ESPN data (schedule + injuries + form) before calling AI
+  addTyping();
+  let espnContext = '';
+  try {
+    espnContext = await fetchFullScheduleContext(S.sport);
+  } catch(e) {
+    espnContext = await fetchSchedule(S.sport).catch(() => '');
   }
 
-  const system = `You are BetPilot, an expert AI sports betting advisor. Be direct and confident.
+  const system = `You are BetPilot, an expert AI sports betting advisor. Be direct, confident, and data-driven.
 
 USER STATE:
 - Sport: ${S.sport} | Date: ${new Date().toDateString()}
@@ -506,15 +565,19 @@ USER STATE:
 - Risk: ${p.label} — max ${(p.maxS*100).toFixed(0)}% per bet, needs ${(p.minEdge*100).toFixed(0)}%+ edge
 - Open bets: ${openBets.length>0?openBets.map(b=>`${b.matchup} $${b.stake} on ${b.pick}`).join(', '):'none'}
 - ROI: ${roi.toFixed(1)}% | P&L: ${pnl>=0?'+':''}$${pnl.toFixed(2)}
-${scheduleContext}
+
+LIVE ESPN DATA FOR ${S.sport} TODAY:
+${espnContext}
 
 RULES:
-1. Use the real ESPN schedule data above when available. List actual games with real teams and times.
-2. When giving a pick: choose ONE game from the schedule, give 2-3 sentences of real analysis, estimate a win probability and suggest decimal odds.
-3. ALWAYS end bet recommendations with this exact line (no line break inside):
-   BETCARD:{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"short reason","prob":0.62,"suggestedOdds":2.10,"market":"Moneyline"}
-4. Max 3 short paragraphs. Use **bold** for key info.
-5. Never tell the user to manually settle bets — the app does it automatically via ESPN scores.`;
+1. Use the ESPN data above — it includes real schedules, injury reports, win-loss records, and last 5 game form. This is live data, not your training knowledge.
+2. When recommending a bet: pick ONE game, reference specific injury/form data in your analysis (e.g. "their starting QB is out", "they've won 4 of last 5"), estimate win probability, suggest decimal odds.
+3. ALWAYS end bet recommendations with this exact line:
+   BETCARD:{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"one line citing real data","prob":0.62,"suggestedOdds":2.10,"market":"Moneyline"}
+4. Max 3 short paragraphs. Use **bold** for key points.
+5. If no games today, say so clearly and offer to look at another sport.
+6. Never ask the user to manually settle bets — the app auto-settles via ESPN.`;
+
 
   const chatHistory = (sportChats[S.sport] || [])
     .filter(m => m.role === 'user' || m.role === 'assistant')
