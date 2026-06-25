@@ -206,9 +206,11 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:
     <div class="sidebar-tabs">
       <button class="stab on" id="dTabOpen" onclick="dSideTab('open')">Open Bets</button>
       <button class="stab" id="dTabHistory" onclick="dSideTab('history')">History</button>
+      <button class="stab" id="dTabStats" onclick="dSideTab('stats')">Stats</button>
     </div>
     <div class="bets-scroll" id="dViewOpen"></div>
     <div class="bets-scroll hidden" id="dViewHistory"></div>
+    <div class="bets-scroll hidden" id="dViewStats"></div>
   </div>
 
   <!-- MOBILE NAV -->
@@ -217,7 +219,8 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:
       <button class="mnav-btn on" id="mnavChat" onclick="mobileTab('chat')"><span class="mnav-icon">💬</span>Chat</button>
       <button class="mnav-btn" id="mnavBankroll" onclick="mobileTab('bankroll')"><span class="mnav-icon">💰</span>Bankroll</button>
       <button class="mnav-btn" id="mnavBets" onclick="mobileTab('bets')"><span class="mnav-icon">📋</span>Bets</button>
-      <button class="mnav-btn" id="mnavHistory" onclick="mobileTab('history')"><span class="mnav-icon">📊</span>History</button>
+      <button class="mnav-btn" id="mnavHistory" onclick="mobileTab('history')"><span class="mnav-icon">📋</span>History</button>
+      <button class="mnav-btn" id="mnavStats" onclick="mobileTab('stats')"><span class="mnav-icon">📈</span>Stats</button>
     </div>
   </div>
 </div>
@@ -889,16 +892,162 @@ function renderDesktopBets() {
 }
 
 function dSideTab(tab) {
-  document.getElementById('dViewOpen').classList.toggle('hidden',tab!=='open');
-  document.getElementById('dViewHistory').classList.toggle('hidden',tab!=='history');
-  document.getElementById('dTabOpen').classList.toggle('on',tab==='open');
-  document.getElementById('dTabHistory').classList.toggle('on',tab==='history');
+  ['open','history','stats'].forEach(t => {
+    document.getElementById('dView'+t.charAt(0).toUpperCase()+t.slice(1))?.classList.toggle('hidden',t!==tab);
+    document.getElementById('dTab'+t.charAt(0).toUpperCase()+t.slice(1))?.classList.toggle('on',t===tab);
+  });
+  if (tab==='stats') renderStatsPanel(document.getElementById('dViewStats'));
 }
+
+function renderStatsPanel(container) {
+  if (!container) return;
+  const settled = S.bets.filter(b => b.status !== 'open');
+  const open = S.bets.filter(b => b.status === 'open');
+  const wins = settled.filter(b => b.status === 'won');
+  const losses = settled.filter(b => b.status === 'lost');
+  const totalStaked = settled.reduce((s,b) => s+b.stake, 0);
+  const totalPnl = settled.reduce((s,b) => s+(b.pnl||0), 0);
+  const roi = totalStaked > 0 ? (totalPnl/totalStaked*100) : 0;
+  const growth = ((S.bankroll - S.start) / S.start * 100);
+  const winRate = settled.length > 0 ? (wins.length/settled.length*100) : 0;
+
+  // Bankroll over time — reconstruct from bets
+  const timeline = [{t: 'Start', v: S.start}];
+  const sortedSettled = [...settled].sort((a,b) => new Date(a.settledAt||a.placedAt) - new Date(b.settledAt||b.placedAt));
+  let running = S.start;
+  sortedSettled.forEach(b => {
+    running = Math.round((running + (b.pnl||0)) * 100) / 100;
+    const d = new Date(b.settledAt||b.placedAt);
+    timeline.push({t: d.toLocaleDateString([], {month:'short',day:'numeric'}), v: running, status: b.status});
+  });
+  timeline.push({t: 'Now', v: S.bankroll});
+
+  // ROI by sport
+  const bySport = {};
+  settled.forEach(b => {
+    if (!bySport[b.sport]) bySport[b.sport] = {staked:0, pnl:0, count:0};
+    bySport[b.sport].staked += b.stake;
+    bySport[b.sport].pnl += (b.pnl||0);
+    bySport[b.sport].count++;
+  });
+
+  // Chart dimensions
+  const W = 260, H = 80;
+  const vals = timeline.map(p => p.v);
+  const min = Math.min(...vals) * 0.98;
+  const max = Math.max(...vals) * 1.02;
+  const range = max - min || 1;
+  const pts = timeline.map((p, i) => {
+    const x = (i / Math.max(timeline.length-1, 1)) * W;
+    const y = H - ((p.v - min) / range) * H;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+
+  // Color dots on chart
+  const dots = timeline.slice(1).map((p, i) => {
+    const x = ((i+1) / Math.max(timeline.length-1, 1)) * W;
+    const y = H - ((p.v - min) / range) * H;
+    const c = p.status === 'won' ? '#2ED573' : p.status === 'lost' ? '#FF4757' : '#6B7FA3';
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${c}"/>`;
+  }).join('');
+
+  const sportRows = Object.entries(bySport).map(([sport, d]) => {
+    const sroi = d.staked > 0 ? (d.pnl/d.staked*100) : 0;
+    const color = sroi >= 0 ? '#2ED573' : '#FF4757';
+    const barW = Math.min(Math.abs(sroi) * 2, 100);
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+        <span>${sport}</span>
+        <span style="color:${color};font-weight:600">${sroi>=0?'+':''}${sroi.toFixed(1)}% ROI (${d.count} bets)</span>
+      </div>
+      <div style="height:4px;background:var(--dim);border-radius:2px;overflow:hidden">
+        <div style="height:100%;width:${barW}%;background:${color};border-radius:2px"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Streak
+  let streak = 0, streakType = '';
+  for (let i = sortedSettled.length-1; i >= 0; i--) {
+    const s = sortedSettled[i].status;
+    if (i === sortedSettled.length-1) { streakType = s; streak = 1; }
+    else if (s === streakType) streak++;
+    else break;
+  }
+  const streakStr = streak > 0 ? `${streak} ${streakType === 'won' ? '🟢' : '🔴'} in a row` : '—';
+  const avgStake = totalStaked > 0 ? (totalStaked / settled.length).toFixed(2) : '0.00';
+  const avgOdds = settled.length > 0 ? (settled.reduce((s,b)=>s+b.odds,0)/settled.length).toFixed(2) : '0.00';
+  const parlays = settled.filter(b => b.isParlay);
+  const singles = settled.filter(b => !b.isParlay);
+  const singlesWinRate = singles.length > 0 ? (singles.filter(b=>b.status==='won').length/singles.length*100).toFixed(0) : '0';
+  const parlaysWinRate = parlays.length > 0 ? (parlays.filter(b=>b.status==='won').length/parlays.length*100).toFixed(0) : '—';
+
+  container.innerHTML = `<div style="padding:12px;overflow-y:auto;height:100%">
+
+    <!-- BANKROLL CHART -->
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Bankroll over time</div>
+    ${timeline.length < 2
+      ? '<div style="font-size:12px;color:var(--muted);padding:20px 0;text-align:center">Settle some bets to see your chart</div>'
+      : `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px">
+          <svg width="100%" viewBox="0 0 ${W} ${H}" style="overflow:visible">
+            <polyline points="${pts}" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linejoin="round"/>
+            <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#00E5B4" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#00E5B4" stop-opacity="0"/>
+            </linearGradient>
+            <polygon points="${pts} ${W},${H} 0,${H}" fill="url(#cg)"/>
+            ${dots}
+          </svg>
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px">
+            <span>$${S.start.toFixed(0)}</span>
+            <span style="color:${growth>=0?'var(--green)':'var(--red)'};font-weight:600">${growth>=0?'+':''}${growth.toFixed(1)}%</span>
+            <span>$${S.bankroll.toFixed(0)}</span>
+          </div>
+        </div>`
+    }
+
+    <!-- KEY STATS -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px">
+      <div class="stat-box"><div class="stat-val" style="color:${roi>=0?'var(--green)':'var(--red)'}">${roi>=0?'+':''}${roi.toFixed(1)}%</div><div class="stat-lbl">Overall ROI</div></div>
+      <div class="stat-box"><div class="stat-val">${winRate.toFixed(0)}%</div><div class="stat-lbl">Win rate</div></div>
+      <div class="stat-box"><div class="stat-val">${wins.length}W / ${losses.length}L</div><div class="stat-lbl">Record</div></div>
+      <div class="stat-box"><div class="stat-val" style="color:${totalPnl>=0?'var(--green)':'var(--red)'}">${totalPnl>=0?'+':''}$${totalPnl.toFixed(2)}</div><div class="stat-lbl">Total P&L</div></div>
+      <div class="stat-box"><div class="stat-val">$${avgStake}</div><div class="stat-lbl">Avg stake</div></div>
+      <div class="stat-box"><div class="stat-val">${avgOdds}x</div><div class="stat-lbl">Avg odds</div></div>
+      <div class="stat-box"><div class="stat-val">${streakStr}</div><div class="stat-lbl">Current streak</div></div>
+      <div class="stat-box"><div class="stat-val">${singlesWinRate}% / ${parlaysWinRate}%</div><div class="stat-lbl">Single / Parlay W%</div></div>
+    </div>
+
+    <!-- ROI BY SPORT -->
+    ${Object.keys(bySport).length > 0 ? `
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">ROI by sport</div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px">
+      ${sportRows}
+    </div>` : ''}
+
+    <!-- OPEN EXPOSURE -->
+    ${open.length > 0 ? `
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Open exposure</div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px">
+      ${open.map(b => {
+        const pct = (b.stake/S.bankroll*100).toFixed(1);
+        return `<div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+            <span style="color:var(--txt)">${b.pick}</span><span style="color:var(--amber)">$${b.stake.toFixed(2)} (${pct}%)</span>
+          </div>
+          <div style="font-size:10px;color:var(--muted)">${b.matchup} · ${b.sport}</div>
+        </div>`;
+      }).join('')}
+    </div>` : ''}
+
+  </div>`;
+}
+
 
 /* ── MOBILE ── */
 function mobileTab(tab) {
   if(window.innerWidth>768)return;
-  ['chat','bankroll','bets','history'].forEach(t=>{
+  ['chat','bankroll','bets','history','stats'].forEach(t=>{
     document.getElementById('mnav'+t.charAt(0).toUpperCase()+t.slice(1))?.classList.toggle('on',t===tab);
   });
   const chatPanel=document.getElementById('chatPanel');
@@ -963,6 +1112,9 @@ function mobileTab(tab) {
         :hist.map(b=>betItemHTML(b,false)).join('')
          +'<button class="clear-btn" onclick="clearHistory();mobileTab(\'history\')">🗑 Clear history</button>'}
     </div>`;
+  } else if(tab==='stats'){
+    panel.style.overflow='hidden';
+    renderStatsPanel(panel);
   }
 
   const nav=document.querySelector('.mobile-nav');
