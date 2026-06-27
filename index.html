@@ -174,6 +174,7 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:
         <button class="sport-pill" data-s="NHL" onclick="setSport(this)">🏒 NHL</button>
         <button class="sport-pill" data-s="MLB" onclick="setSport(this)">⚾ MLB</button>
         <button class="sport-pill" data-s="World Cup" onclick="setSport(this)">⚽ World Cup</button>
+        <button class="sport-pill" data-s="O/U" onclick="setSport(this)" style="background:rgba(255,182,39,.1);border-color:rgba(255,182,39,.4);color:var(--amber)">📊 O/U</button>
       </div>
     </div>
     <div class="messages" id="messages"></div>
@@ -776,7 +777,7 @@ const PROFILES = {
   aggressive:{kf:.40,maxS:.08,maxE:.40,minEdge:.02,label:'Bold'}
 };
 
-const SPORTS = ['NFL','NBA','NHL','MLB','World Cup'];
+const SPORTS = ['NFL','NBA','NHL','MLB','World Cup','O/U'];
 
 // Per-sport chat histories
 let sportChats = {};
@@ -836,6 +837,22 @@ function setSport(el) {
   el.classList.add('on');
   S.sport = el.dataset.s;
   save();
+  if (S.sport === 'O/U') {
+    loadOUView();
+  } else {
+    document.getElementById('ouView')?.remove();
+    document.getElementById('messages').style.display = 'flex';
+    document.querySelector('.input-area').style.display = 'block';
+    loadSportChat(S.sport);
+  }
+}
+
+function setSport(el) {
+  saveSportChat();
+  document.querySelectorAll('.sport-pill').forEach(x => x.classList.remove('on'));
+  el.classList.add('on');
+  S.sport = el.dataset.s;
+  save();
   loadSportChat(S.sport);
 }
 
@@ -847,6 +864,7 @@ function saveSportChat() {
 }
 
 function loadSportChat(sport) {
+  if (sport === 'O/U') { loadOUView(); return; }
   const msgs = document.getElementById('messages');
   msgs.innerHTML = '';
   const history = sportChats[sport] || [];
@@ -860,6 +878,227 @@ function loadSportChat(sport) {
       msgs.appendChild(div);
     });
     msgs.scrollTop = msgs.scrollHeight;
+  }
+}
+
+/* ── OVER/UNDER ENGINE ── */
+const OU_SPORTS = [
+  { name:'NFL', key:'americanfootball_nfl', market:'totals', label:'🏈 NFL', unit:'pts' },
+  { name:'NBA', key:'basketball_nba', market:'totals', label:'🏀 NBA', unit:'pts' },
+  { name:'NHL', key:'icehockey_nhl', market:'totals', label:'🏒 NHL', unit:'goals' },
+  { name:'MLB', key:'baseball_mlb', market:'totals', label:'⚾ MLB', unit:'runs' },
+  { name:'World Cup', key:'soccer_fifa_world_cup', market:'totals', label:'⚽ World Cup', unit:'goals' },
+];
+
+async function fetchOULines(sportKey) {
+  try {
+    const r = await fetch(`/api/chat?odds=1&sport=${sportKey}&market=totals`);
+    if (!r.ok) return [];
+    const data = await r.json();
+    return data || [];
+  } catch(e) { return []; }
+}
+
+function parseOULines(events) {
+  const lines = [];
+  events.forEach(event => {
+    const home = event.home_team;
+    const away = event.away_team;
+    const commence = new Date(event.commence_time);
+    let bestOver = null, bestUnder = null, line = null;
+    event.bookmakers?.forEach(book => {
+      book.markets?.forEach(market => {
+        if (market.key !== 'totals') return;
+        market.outcomes?.forEach(o => {
+          if (o.name === 'Over') {
+            line = o.point;
+            if (!bestOver || o.price > bestOver.price) bestOver = { price: o.price, book: book.title, point: o.point };
+          }
+          if (o.name === 'Under') {
+            if (!bestUnder || o.price > bestUnder.price) bestUnder = { price: o.price, book: book.title, point: o.point };
+          }
+        });
+      });
+    });
+    if (bestOver || bestUnder) {
+      lines.push({ home, away, commence, line: line || bestOver?.point, bestOver, bestUnder, bookCount: event.bookmakers?.length || 0 });
+    }
+  });
+  return lines;
+}
+
+async function analyzeOUGame(game, sport, unit) {
+  const prof = PROFILES[S.risk];
+  const prompt = `You are a sports betting expert analyzing an Over/Under total.
+
+Game: ${game.away} @ ${game.home}
+Sport: ${sport}
+Total line: ${game.line} ${unit}
+Best Over odds: ${game.bestOver ? game.bestOver.price + ' @ ' + game.bestOver.book : 'N/A'}
+Best Under odds: ${game.bestUnder ? game.bestUnder.price + ' @ ' + game.bestUnder.book : 'N/A'}
+Books offering this line: ${game.bookCount}
+User bankroll: $${S.bankroll.toFixed(2)} | Risk: ${prof.label}
+
+Analyze this O/U total using:
+1. Team scoring trends (recent games)
+2. Pace of play / scoring environment
+3. Defensive matchup
+4. Weather if outdoor sport (NFL, MLB, World Cup)
+5. Key injuries to offensive/defensive players
+6. Home/away scoring differences
+
+Be decisive — say "BET OVER" or "BET UNDER" clearly.
+Your response must end with EXACTLY this line (valid JSON, nothing after):
+OUCARD:{"pick":"Over","line":${game.line},"prob":0.58,"reason":"2-3 specific factors","unit":"${unit}"}`;
+
+  try {
+    const r = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 400,
+        temperature: 0.6,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await r.json();
+    const raw = data.choices?.[0]?.message?.content || '';
+    const match = raw.match(/OUCARD:\s*(\{[\s\S]*?\})/);
+    if (match) {
+      const card = JSON.parse(match[1]);
+      const analysis = raw.replace(/OUCARD[\s\S]*/, '').trim();
+      return { ...card, analysis };
+    }
+    return null;
+  } catch(e) { return null; }
+}
+
+function buildOUCard(game, analysis, sport, unit) {
+  if (!analysis) {
+    return `<div class="bet-card" style="opacity:0.5">
+      <div class="bet-card-sport">${sport} · O/U</div>
+      <div class="bet-card-matchup" style="font-size:16px">${game.away} @ ${game.home}</div>
+      <div style="font-size:12px;color:var(--muted)">Analysis unavailable</div>
+    </div>`;
+  }
+  const isOver = analysis.pick?.toLowerCase() === 'over';
+  const pickColor = isOver ? 'var(--green)' : 'var(--red)';
+  const pickIcon = isOver ? '📈' : '📉';
+  const sr = calcStake(analysis.prob || 0.55, isOver ? (game.bestOver?.price || 1.9) : (game.bestUnder?.price || 1.9));
+  const imp = 1 / (isOver ? (game.bestOver?.price || 1.9) : (game.bestUnder?.price || 1.9));
+  const edge = (analysis.prob || 0.55) - imp;
+  const edgeColor = edge > 0 ? 'var(--teal)' : 'var(--red)';
+  const time = game.commence.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+
+  // Store as pending bet
+  const betId = Date.now().toString() + Math.random();
+  const pendingOU = {
+    id: betId, sport, matchup: `${game.away} @ ${game.home}`,
+    pick: `${analysis.pick} ${analysis.line} ${unit}`,
+    market: 'Total', stake: sr.stake,
+    odds: isOver ? (game.bestOver?.price || 1.9) : (game.bestUnder?.price || 1.9),
+    suggestedOdds: isOver ? (game.bestOver?.price || 1.9) : (game.bestUnder?.price || 1.9)
+  };
+  if (!S.allPendingBets) S.allPendingBets = [];
+  const betIndex = S.allPendingBets.length;
+  S.allPendingBets.push(pendingOU);
+
+  return `<div class="bet-card" style="border-color:${pickColor};margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div class="bet-card-sport" style="color:var(--muted)">${sport} · TOTAL · ${time}</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:${pickColor}">${pickIcon} ${analysis.pick?.toUpperCase()} ${analysis.line} ${unit}</div>
+    </div>
+    <div class="bet-card-matchup" style="font-size:16px">${game.away} @ ${game.home}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">${analysis.analysis || ''}</div>
+    <div class="bet-stats">
+      <div class="bet-stat"><div class="bet-stat-val" style="color:${edgeColor}">${edge>=0?'+':''}${(edge*100).toFixed(1)}%</div><div class="bet-stat-lbl">Edge</div></div>
+      <div class="bet-stat"><div class="bet-stat-val">${((analysis.prob||0.55)*100).toFixed(0)}%</div><div class="bet-stat-lbl">Confidence</div></div>
+      <div class="bet-stat"><div class="bet-stat-val" style="color:var(--amber)">${analysis.line} ${unit}</div><div class="bet-stat-lbl">Line</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0">
+      <div style="background:var(--card);border-radius:6px;padding:7px;text-align:center">
+        <div style="font-size:11px;color:var(--muted)">Best Over</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:600;color:var(--green)">${game.bestOver ? game.bestOver.price + ' @ ' + game.bestOver.book.split(' ')[0] : '—'}</div>
+      </div>
+      <div style="background:var(--card);border-radius:6px;padding:7px;text-align:center">
+        <div style="font-size:11px;color:var(--muted)">Best Under</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:600;color:var(--red)">${game.bestUnder ? game.bestUnder.price + ' @ ' + game.bestUnder.book.split(' ')[0] : '—'}</div>
+      </div>
+    </div>
+    ${sr.stake > 0 ? `
+    <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Stake: <strong style="color:var(--txt);font-size:15px">$${sr.stake.toFixed(2)}</strong> <span style="color:var(--muted)">(${sr.usedPct}% of bankroll)</span></div>
+    <div class="bet-actions">
+      <button class="bet-btn yes" onclick="logBetByIndex(${betIndex})">✓ Log ${analysis.pick} ${analysis.line} — $${sr.stake.toFixed(2)}</button>
+      <button class="bet-btn no" onclick="this.closest('.bet-card').style.opacity='0.4'">Skip</button>
+    </div>` : `<div style="font-size:12px;color:var(--muted);padding:8px;background:var(--dim);border-radius:6px">${sr.reason||'Edge below minimum — pass'}</div>`}
+  </div>`;
+}
+
+async function loadOUView() {
+  // Hide normal chat, show O/U view
+  document.getElementById('messages').style.display = 'none';
+  document.querySelector('.input-area').style.display = 'none';
+  document.getElementById('ouView')?.remove();
+
+  const view = document.createElement('div');
+  view.id = 'ouView';
+  view.style.cssText = 'flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch';
+  view.innerHTML = `
+    <div style="text-align:center;padding:30px 0 20px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:700;color:var(--amber)">📊 Over / Under</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px">Loading today's totals across all sports...</div>
+    </div>
+    <div id="ouCards" style="max-width:700px;margin:0 auto"></div>`;
+  document.getElementById('chatPanel').appendChild(view);
+
+  const cardsEl = document.getElementById('ouCards');
+  S.allPendingBets = [];
+
+  let totalGames = 0;
+  let loaded = 0;
+
+  for (const sport of OU_SPORTS) {
+    const events = await fetchOULines(sport.key);
+    const games = parseOULines(events);
+    if (!games.length) continue;
+    totalGames += games.length;
+
+    // Sport header
+    const header = document.createElement('div');
+    header.innerHTML = `<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border)">${sport.label} — ${games.length} game${games.length>1?'s':''} with O/U lines</div>`;
+    cardsEl.appendChild(header);
+
+    // Analyze each game and render card
+    for (const game of games.slice(0, 4)) {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'bet-card';
+      placeholder.style.cssText = 'margin-bottom:12px;opacity:0.5';
+      placeholder.innerHTML = `
+        <div class="bet-card-sport" style="color:var(--muted)">${sport.name} · O/U · ANALYZING...</div>
+        <div class="bet-card-matchup" style="font-size:16px">${game.away} @ ${game.home}</div>
+        <div style="display:flex;gap:5px;align-items:center;margin-top:8px">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--teal);animation:bounce .9s infinite"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--teal);animation:bounce .9s .15s infinite"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--teal);animation:bounce .9s .3s infinite"></div>
+        </div>`;
+      cardsEl.appendChild(placeholder);
+
+      // Analyze async
+      analyzeOUGame(game, sport.name, sport.unit).then(analysis => {
+        placeholder.outerHTML = buildOUCard(game, analysis, sport.name, sport.unit);
+        save();
+        loaded++;
+      });
+    }
+  }
+
+  if (totalGames === 0) {
+    cardsEl.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted)">
+      <div style="font-size:32px;margin-bottom:12px">📊</div>
+      <div style="font-size:14px">No O/U lines available right now.</div>
+      <div style="font-size:12px;margin-top:6px">Check back closer to game time, or make sure your Odds API key is set in Vercel.</div>
+    </div>`;
   }
 }
 
