@@ -958,11 +958,15 @@ ${dataContext}
 RULES:
 1. You have ALL 7 BETTING FACTORS for each game: [1-INJURIES], [2-FORM], [3-HOME ADVANTAGE], [4-H2H], [5-REST], [6-WEATHER], [7-LINE MOVEMENT]. Use ALL of them.
 2. Never mention data sources. Speak naturally: "they have 3 days rest vs 1 for the visitors", "sharp money is leaning home", "their starting QB is out".
-3. When recommending a single bet: weigh all 7 factors, explain which 2-3 tipped your decision, give win probability. Your LAST LINE must be EXACTLY this (no text after it):
+3. When recommending a bet: pick EXACTLY ONE game. Write 2-3 sentences of analysis. Then your ABSOLUTE LAST LINE must be ONE single BETCARD — nothing else after it:
 BETCARD:{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"top 2-3 factors","prob":0.62,"suggestedOdds":2.10,"market":"Moneyline"}
-4. For PARLAY request: find 2-3 games where multiple factors align strongly (60%+ each). Your LAST LINE must be EXACTLY this (no text after it):
-PARLAY:[{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"key factors","prob":0.62,"odds":1.85},{"matchup":"Team C vs Team D","sport":"${S.sport}","pick":"Team C","reason":"key factors","prob":0.65,"odds":1.75}]
-CRITICAL: BETCARD and PARLAY must be on their own line at the very end. No text after them. Valid JSON only — no trailing commas, no extra brackets.
+4. For PARLAY: combine 2-3 legs into ONE PARLAY line as your last line — nothing after it:
+PARLAY:[{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"reason","prob":0.62,"odds":1.85},{"matchup":"Team C vs Team D","sport":"${S.sport}","pick":"Team C","reason":"reason","prob":0.65,"odds":1.75}]
+CRITICAL RULES:
+- NEVER output multiple BETCARDs. ONE recommendation only.
+- BETCARD/PARLAY must be the very last thing you write. Nothing after it.
+- Valid JSON only. No trailing commas. No line breaks inside the JSON.
+- If user asks for all games, list them in text ONLY — still end with ONE BETCARD for your top pick.
 5. Factor weighting: Injuries > Form > Rest/Schedule > H2H > Home advantage > Line movement > Weather. But if weather is severe, it overrides everything for totals.
 6. Rest matters most in NBA (back-to-backs destroy teams). H2H matters most in rivalries and playoffs.
 7. SOCCER/WORLD CUP DRAWS: On a standard moneyline bet, a DRAW means the bettor LOSES — there is NO refund, NO push. Never tell users a draw refunds their stake. For safer soccer picks, recommend "Double Chance" (team wins OR draws) instead of straight moneyline. Always mention draw risk for close soccer games.
