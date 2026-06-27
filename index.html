@@ -717,10 +717,17 @@ async function checkAndAutoSettle() {
             const pickMatchesAway = awayTokens.some(t => t.length > 2 && pick.includes(t));
 
             let result;
-            if (homeScore === awayScore) result = 'pushed';
-            else if (pickMatchesHome && homeScore > awayScore) result = 'won';
+            const isDraw = homeScore === awayScore;
+            const isSoccer = ['World Cup','Soccer','MLS'].includes(sport);
+            if (isDraw && isSoccer) {
+              // In soccer, a draw on a moneyline (team to win) bet = LOST
+              result = (pickMatchesHome || pickMatchesAway) ? 'lost' : 'pushed';
+            } else if (isDraw) {
+              // In other sports, tie = pushed (stake returned)
+              result = 'pushed';
+            } else if (pickMatchesHome && homeScore > awayScore) result = 'won';
             else if (pickMatchesAway && awayScore > homeScore) result = 'won';
-            else if (!pickMatchesHome && !pickMatchesAway) continue; // can't determine pick side
+            else if (!pickMatchesHome && !pickMatchesAway) continue;
             else result = 'lost';
 
             autoSettle(bet.id, result, homeName, awayName, homeScore, awayScore);
@@ -951,14 +958,16 @@ ${dataContext}
 RULES:
 1. You have ALL 7 BETTING FACTORS for each game: [1-INJURIES], [2-FORM], [3-HOME ADVANTAGE], [4-H2H], [5-REST], [6-WEATHER], [7-LINE MOVEMENT]. Use ALL of them.
 2. Never mention data sources. Speak naturally: "they have 3 days rest vs 1 for the visitors", "sharp money is leaning home", "their starting QB is out".
-3. When recommending a single bet: weigh all 7 factors, explain which 2-3 tipped your decision, give win probability. End with:
-   BETCARD:{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"top 2-3 factors that decided this","prob":0.62,"suggestedOdds":2.10,"market":"Moneyline"}
-4. For PARLAY request: find 2-3 games where multiple factors align strongly (60%+ each). End with:
-   PARLAY:[{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"key factors","prob":0.62,"odds":1.85},{"matchup":"Team C vs Team D","sport":"${S.sport}","pick":"Team C","reason":"key factors","prob":0.65,"odds":1.75}]
+3. When recommending a single bet: weigh all 7 factors, explain which 2-3 tipped your decision, give win probability. Your LAST LINE must be EXACTLY this (no text after it):
+BETCARD:{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"top 2-3 factors","prob":0.62,"suggestedOdds":2.10,"market":"Moneyline"}
+4. For PARLAY request: find 2-3 games where multiple factors align strongly (60%+ each). Your LAST LINE must be EXACTLY this (no text after it):
+PARLAY:[{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"key factors","prob":0.62,"odds":1.85},{"matchup":"Team C vs Team D","sport":"${S.sport}","pick":"Team C","reason":"key factors","prob":0.65,"odds":1.75}]
+CRITICAL: BETCARD and PARLAY must be on their own line at the very end. No text after them. Valid JSON only — no trailing commas, no extra brackets.
 5. Factor weighting: Injuries > Form > Rest/Schedule > H2H > Home advantage > Line movement > Weather. But if weather is severe, it overrides everything for totals.
 6. Rest matters most in NBA (back-to-backs destroy teams). H2H matters most in rivalries and playoffs.
-7. Max 3 paragraphs. **Bold** the single most important factor. No games = offer another sport.
-8. Never ask user to settle bets — automatic.`;
+7. SOCCER/WORLD CUP DRAWS: On a standard moneyline bet, a DRAW means the bettor LOSES — there is NO refund, NO push. Never tell users a draw refunds their stake. For safer soccer picks, recommend "Double Chance" (team wins OR draws) instead of straight moneyline. Always mention draw risk for close soccer games.
+8. Max 3 paragraphs. **Bold** the single most important factor. No games = offer another sport.
+9. Never ask user to settle bets — automatic.`;
 
   const chatHistory = (sportChats[S.sport] || [])
     .filter(m => m.role === 'user' || m.role === 'assistant')
@@ -980,26 +989,41 @@ RULES:
     if (data.error) { removeTyping(); addMsg('ai',`Error: ${data.error.message}`,''); return; }
     const raw = data.choices[0].message.content;
     removeTyping();
-    // Check for PARLAY first
-    const parlayMatch = raw.match(/PARLAY:\s*(\[[\s\S]*?\])/);
-    const betMatch = raw.match(/BETCARD:\s*(\{[\s\S]*?\})/);
 
-    if (parlayMatch) {
+    // Robust parser — extract JSON from anywhere in the response
+    function extractJSON(text, prefix, openChar, closeChar) {
+      const idx = text.indexOf(prefix);
+      if (idx === -1) return null;
+      const start = text.indexOf(openChar, idx);
+      if (start === -1) return null;
+      let depth = 0, i = start;
+      while (i < text.length) {
+        if (text[i] === openChar) depth++;
+        else if (text[i] === closeChar) { depth--; if (depth === 0) return text.slice(start, i+1); }
+        i++;
+      }
+      return null;
+    }
+
+    const parlayJSON = extractJSON(raw, 'PARLAY:', '[', ']');
+    const betJSON = extractJSON(raw, 'BETCARD:', '{', '}');
+
+    if (parlayJSON) {
       try {
-        const legs = JSON.parse(parlayMatch[1]);
+        const legs = JSON.parse(parlayJSON);
         const sr = calcParlayStake(legs);
         S.pendingBet = { isParlay:true, legs, stake:sr.stake, combinedOdds:sr.combinedOdds, combinedProb:sr.combinedProb, sport:legs[0].sport, id:Date.now().toString() };
         save();
-        const cleanText = raw.replace(/PARLAY:\s*\[[\s\S]*?\]/, '').trim();
+        const cleanText = raw.replace(/PARLAY\s*:[\s\S]*/, '').trim();
         addMsg('ai', mdToHtml(cleanText) + buildParlayCard(legs, sr), raw);
-      } catch(e) { addMsg('ai', mdToHtml(raw), raw); }
-    } else if (betMatch) {
+      } catch(e) { console.error('Parlay parse error:', e); addMsg('ai', mdToHtml(raw.replace(/PARLAY[\s\S]*/,'')), raw); }
+    } else if (betJSON) {
       try {
-        const bc = JSON.parse(betMatch[1]);
+        const bc = JSON.parse(betJSON);
         const sr = calcStake(bc.prob, bc.suggestedOdds||2.0);
         S.pendingBet = {...bc, stake:sr.stake, stakeResult:sr, id:Date.now().toString()};
         save();
-        const cleanText = raw.replace(/BETCARD:\s*\{[\s\S]*?\}/, '').trim();
+        const cleanText = raw.replace(/BETCARD[\s\S]*/, '').trim();
         // Calculate Edge Score in background, show card immediately then update
         const [homeTeam, awayTeam] = bc.matchup.includes(' vs ') ? bc.matchup.split(' vs ') : bc.matchup.split(' @ ').reverse();
         const msgEl = addMsg('ai', mdToHtml(cleanText)+buildBetCard(bc,sr,null), raw);
