@@ -10,7 +10,8 @@ export default async function handler(req, res) {
     const oddsKey = process.env.ODDS_API_KEY;
     if (!oddsKey) return res.status(500).json({ error: 'Odds API key not configured.' });
     const sport = req.query.sport || 'americanfootball_nfl';
-    const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds?apiKey=${oddsKey}&regions=us,uk&markets=h2h&oddsFormat=decimal&dateFormat=iso`;
+    const market = req.query.market || 'h2h';
+    const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds?apiKey=${oddsKey}&regions=us,uk&markets=${market}&oddsFormat=decimal&dateFormat=iso`;
     try {
       const r = await fetch(url);
       const d = await r.json();
