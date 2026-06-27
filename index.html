@@ -964,10 +964,15 @@ For non-soccer sports, omit drawProb/homeWinProb/awayWinProb.
 4. For PARLAY: combine 2-3 legs into ONE PARLAY line as your last line — nothing after it:
 PARLAY:[{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"reason","prob":0.62,"odds":1.85},{"matchup":"Team C vs Team D","sport":"${S.sport}","pick":"Team C","reason":"reason","prob":0.65,"odds":1.75}]
 CRITICAL RULES:
-- NEVER output multiple BETCARDs. ONE recommendation only.
-- BETCARD/PARLAY must be the very last thing you write. Nothing after it.
-- Valid JSON only. No trailing commas. No line breaks inside the JSON.
-- If user asks for all games, list them in text ONLY — still end with ONE BETCARD for your top pick.
+- Be DECISIVE. Never hedge. Say "Bet Colombia to win" not "Colombia might have an edge". Pick a side and commit.
+- When user asks to predict ALL games today: output ONE BETCARD per game, back to back, with NO extra text between them. Just a one-line intro then all the BETCARDs. Format:
+  Here are today's picks:
+  BETCARD:{...game1...}
+  BETCARD:{...game2...}
+  BETCARD:{...game3...}
+- When user asks for ONE pick (safe pick, best bet, etc.): ONE BETCARD only, at the very end.
+- BETCARD/PARLAY must always be valid JSON. No trailing commas. No line breaks inside JSON.
+- For soccer, always include drawProb, homeWinProb, awayWinProb in every BETCARD.
 5. Factor weighting: Injuries > Form > Rest/Schedule > H2H > Home advantage > Line movement > Weather. But if weather is severe, it overrides everything for totals.
 6. Rest matters most in NBA (back-to-backs destroy teams). H2H matters most in rivalries and playoffs.
 7. SOCCER/WORLD CUP DRAW RULES — CRITICAL:
@@ -1018,7 +1023,20 @@ CRITICAL RULES:
     }
 
     const parlayJSON = extractJSON(raw, 'PARLAY:', '[', ']');
-    const betJSON = extractJSON(raw, 'BETCARD:', '{', '}');
+
+    // Extract ALL BETCARDs from response
+    function extractAllBetcards(text) {
+      const results = [];
+      let remaining = text;
+      while (remaining.includes('BETCARD:')) {
+        const json = extractJSON(remaining, 'BETCARD:', '{', '}');
+        if (!json) break;
+        try { results.push(JSON.parse(json)); } catch(e) {}
+        remaining = remaining.slice(remaining.indexOf('BETCARD:') + json.length + 8);
+      }
+      return results;
+    }
+    const allBetcards = extractAllBetcards(raw);
 
     if (parlayJSON) {
       try {
@@ -1029,9 +1047,24 @@ CRITICAL RULES:
         const cleanText = raw.replace(/PARLAY\s*:[\s\S]*/, '').trim();
         addMsg('ai', mdToHtml(cleanText) + buildParlayCard(legs, sr), raw);
       } catch(e) { console.error('Parlay parse error:', e); addMsg('ai', mdToHtml(raw.replace(/PARLAY[\s\S]*/,'')), raw); }
-    } else if (betJSON) {
+    } else if (allBetcards.length > 1) {
+      // Multiple BETCARDs — show all as cards (predict all games mode)
+      const cleanText = raw.replace(/BETCARD:\s*\{[^}]+\}/g, '').trim();
+      // Store all betcards so user can log any of them
+      S.allPendingBets = allBetcards.map(bc => {
+        const sr = calcStake(bc.prob, bc.suggestedOdds||bc.odds||2.0);
+        return {...bc, stake:sr.stake, stakeResult:sr, id:Date.now().toString()+Math.random()};
+      });
+      save();
+      let cardsHTML = '';
+      S.allPendingBets.forEach((bc, i) => {
+        const sr = bc.stakeResult;
+        cardsHTML += buildBetCard(bc, sr, null, i);
+      });
+      addMsg('ai', mdToHtml(cleanText) + cardsHTML, raw);
+    } else if (allBetcards.length === 1) {
       try {
-        const bc = JSON.parse(betJSON);
+        const bc = allBetcards[0];
         const sr = calcStake(bc.prob, bc.suggestedOdds||2.0);
         S.pendingBet = {...bc, stake:sr.stake, stakeResult:sr, id:Date.now().toString()};
         save();
@@ -1060,7 +1093,7 @@ CRITICAL RULES:
   }
 }
 
-function buildBetCard(bc, sr, edgeScore) {
+function buildBetCard(bc, sr, edgeScore, cardIndex) {
   const ec = sr.ev>0?'var(--green)':'var(--red)';
   const edgec = sr.edge>0?'var(--teal)':'var(--red)';
   const canBet = sr.stake>0;
@@ -1102,7 +1135,7 @@ function buildBetCard(bc, sr, edgeScore) {
     ${canBet
       ? `<div style="margin:10px 0 8px;font-size:13px;color:var(--muted)">Stake: <strong style="color:var(--txt);font-size:15px">$${sr.stake.toFixed(2)}</strong> <span style="color:var(--muted)">(${sr.usedPct}% of bankroll)</span></div>
          <div class="bet-actions">
-           <button class="bet-btn yes" onclick="logBet()">✓ Log — $${sr.stake.toFixed(2)}</button>
+           <button class="bet-btn yes" onclick="${cardIndex!=null?'logBetByIndex('+cardIndex+')':'logBet()'}">${cardIndex!=null?'✓ Log this pick':'✓ Log'} — $${sr.stake.toFixed(2)}</button>
            <button class="bet-btn no" onclick="skipBet()">Skip</button>
          </div>`
       : `<div style="background:rgba(255,71,87,.08);border:1px solid rgba(255,71,87,.2);border-radius:8px;padding:10px;font-size:13px;color:var(--red)">${sr.reason}</div>`
@@ -1122,6 +1155,24 @@ function logBet() {
   S.bankroll = Math.round((S.bankroll-b.stake)*100)/100;
   S.pendingBet = null; save(); renderSidebar();
   const msg = `Bet logged ✓\n\n**$${bet.stake.toFixed(2)}** on **${bet.pick}** (${bet.matchup})\nPotential return: **$${(bet.stake*bet.odds).toFixed(2)}**\n\n⚡ I'll automatically settle this once the game ends. Want another pick?`;
+  addMsg('ai', mdToHtml(msg), msg);
+}
+
+function logBetByIndex(i) {
+  const bets = S.allPendingBets || [];
+  if (!bets[i]) return;
+  const b = bets[i];
+  if (b.stake > S.bankroll) { addMsg('ai','Not enough bankroll for this stake.',''); return; }
+  const bet = {
+    id:b.id, sport:b.sport||S.sport, matchup:b.matchup, pick:b.pick,
+    market:b.market||'Moneyline', stake:b.stake, odds:b.suggestedOdds||b.odds||2.0,
+    status:'open', placedAt:new Date().toISOString(), pnl:null
+  };
+  S.bets.push(bet);
+  S.bankroll = Math.round((S.bankroll-b.stake)*100)/100;
+  S.allPendingBets = [];
+  save(); renderSidebar();
+  const msg = `Bet logged ✓\n\n**$${bet.stake.toFixed(2)}** on **${bet.pick}** (${bet.matchup})\nPotential return: **$${(bet.stake*bet.odds).toFixed(2)}**\n\n⚡ Auto-settles when the game ends. Want another pick?`;
   addMsg('ai', mdToHtml(msg), msg);
 }
 
