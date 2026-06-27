@@ -958,8 +958,9 @@ ${dataContext}
 RULES:
 1. You have ALL 7 BETTING FACTORS for each game: [1-INJURIES], [2-FORM], [3-HOME ADVANTAGE], [4-H2H], [5-REST], [6-WEATHER], [7-LINE MOVEMENT]. Use ALL of them.
 2. Never mention data sources. Speak naturally: "they have 3 days rest vs 1 for the visitors", "sharp money is leaning home", "their starting QB is out".
-3. When recommending a bet: pick EXACTLY ONE game. Write 2-3 sentences of analysis. Then your ABSOLUTE LAST LINE must be ONE single BETCARD — nothing else after it:
-BETCARD:{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"top 2-3 factors","prob":0.62,"suggestedOdds":2.10,"market":"Moneyline"}
+3. When recommending a bet: pick EXACTLY ONE game. Write 2-3 sentences of analysis including draw probability for soccer. Then your ABSOLUTE LAST LINE must be ONE single BETCARD — nothing else after it:
+BETCARD:{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A or Draw","reason":"top 2-3 factors + draw risk assessment","prob":0.62,"suggestedOdds":2.10,"market":"Double Chance","drawProb":0.25,"homeWinProb":0.60,"awayWinProb":0.15}
+For non-soccer sports, omit drawProb/homeWinProb/awayWinProb.
 4. For PARLAY: combine 2-3 legs into ONE PARLAY line as your last line — nothing after it:
 PARLAY:[{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"reason","prob":0.62,"odds":1.85},{"matchup":"Team C vs Team D","sport":"${S.sport}","pick":"Team C","reason":"reason","prob":0.65,"odds":1.75}]
 CRITICAL RULES:
@@ -969,7 +970,14 @@ CRITICAL RULES:
 - If user asks for all games, list them in text ONLY — still end with ONE BETCARD for your top pick.
 5. Factor weighting: Injuries > Form > Rest/Schedule > H2H > Home advantage > Line movement > Weather. But if weather is severe, it overrides everything for totals.
 6. Rest matters most in NBA (back-to-backs destroy teams). H2H matters most in rivalries and playoffs.
-7. SOCCER/WORLD CUP DRAWS: On a standard moneyline bet, a DRAW means the bettor LOSES — there is NO refund, NO push. Never tell users a draw refunds their stake. For safer soccer picks, recommend "Double Chance" (team wins OR draws) instead of straight moneyline. Always mention draw risk for close soccer games.
+7. SOCCER/WORLD CUP DRAW RULES — CRITICAL:
+   - In soccer, there are 3 outcomes: HOME WIN, DRAW, AWAY WIN. You MUST estimate all 3 probabilities and they must add up to ~100%.
+   - A draw happens in roughly 25% of World Cup group stage games. ALWAYS assess draw probability.
+   - If draw probability is 25% or higher: recommend "Double Chance" (e.g. "England or Draw") NOT straight moneyline. Double Chance covers 2 of 3 outcomes.
+   - If draw probability is below 20% and one team is clearly stronger: straight moneyline is fine.
+   - "Draw No Bet" is another option: you back a team but get stake refunded if it draws.
+   - ALWAYS mention draw probability in your analysis for soccer. E.g. "I estimate 60% England win, 25% draw, 15% Panama win — draw risk is real here so I recommend Double Chance."
+   - On a standard moneyline, a DRAW = LOST BET. Never say stake is refunded on a draw.
 8. Max 3 paragraphs. **Bold** the single most important factor. No games = offer another sport.
 9. Never ask user to settle bets — automatic.`;
 
@@ -1057,10 +1065,34 @@ function buildBetCard(bc, sr, edgeScore) {
   const edgec = sr.edge>0?'var(--teal)':'var(--red)';
   const canBet = sr.stake>0;
   const esHTML = edgeScore ? edgeScoreHTML(edgeScore, bc.pick) : '';
+  const isSoccer = ['World Cup','Soccer','MLS'].includes(bc.sport);
+  const drawProb = bc.drawProb || 0;
+  const homeWinProb = bc.homeWinProb || 0;
+  const awayWinProb = bc.awayWinProb || 0;
+  const showOutcomes = isSoccer && (drawProb > 0 || homeWinProb > 0);
+  const drawColor = drawProb >= 0.25 ? 'var(--amber)' : 'var(--muted)';
+  const outcomeHTML = showOutcomes ? `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:10px">
+      <div style="background:var(--card);border-radius:6px;padding:7px;text-align:center">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:600;color:var(--teal)">${(homeWinProb*100).toFixed(0)}%</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:1px">HOME WIN</div>
+      </div>
+      <div style="background:var(--card);border-radius:6px;padding:7px;text-align:center;border:1px solid ${drawColor}">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:600;color:${drawColor}">${(drawProb*100).toFixed(0)}%</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:1px">DRAW ${drawProb>=0.25?'⚠️':''}</div>
+      </div>
+      <div style="background:var(--card);border-radius:6px;padding:7px;text-align:center">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:600;color:var(--teal)">${(awayWinProb*100).toFixed(0)}%</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:1px">AWAY WIN</div>
+      </div>
+    </div>
+    ${drawProb>=0.25 ? '<div style="background:rgba(255,182,39,.08);border:1px solid rgba(255,182,39,.3);border-radius:6px;padding:8px;font-size:12px;color:var(--amber);margin-bottom:8px">⚠️ High draw risk ('+(drawProb*100).toFixed(0)+'%) — Double Chance recommended</div>' : ''}`
+  : '';
   return `<div class="bet-card">
     <div class="bet-card-sport">${bc.sport} · ${bc.market||'Moneyline'}</div>
     <div class="bet-card-matchup">${bc.matchup}</div>
     <div class="bet-card-pick">Pick: <strong style="color:var(--teal)">${bc.pick}</strong> — ${bc.reason}</div>
+    ${outcomeHTML}
     <div class="bet-stats">
       <div class="bet-stat"><div class="bet-stat-val" style="color:${edgec}">${sr.edge>=0?'+':''}${(sr.edge*100).toFixed(1)}%</div><div class="bet-stat-lbl">Edge</div></div>
       <div class="bet-stat"><div class="bet-stat-val" style="color:${ec}">${sr.ev>=0?'+':''}${sr.ev.toFixed(3)}</div><div class="bet-stat-lbl">EV/$1</div></div>
