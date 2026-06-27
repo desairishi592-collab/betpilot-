@@ -1027,12 +1027,20 @@ CRITICAL RULES:
     // Extract ALL BETCARDs from response
     function extractAllBetcards(text) {
       const results = [];
-      let remaining = text;
-      while (remaining.includes('BETCARD:')) {
-        const json = extractJSON(remaining, 'BETCARD:', '{', '}');
-        if (!json) break;
-        try { results.push(JSON.parse(json)); } catch(e) {}
-        remaining = remaining.slice(remaining.indexOf('BETCARD:') + json.length + 8);
+      // Use regex to find all BETCARD:{...} blocks, handling nested content
+      let search = text;
+      while (search.includes('BETCARD:')) {
+        const idx = search.indexOf('BETCARD:');
+        const afterKey = search.slice(idx + 8);
+        const json = extractJSON(afterKey, '{', '{', '}') || extractJSON('X'+afterKey, 'X{', '{', '}');
+        // Simpler: just use extractJSON from the full remaining text
+        const fullJson = extractJSON(search.slice(idx), 'BETCARD:', '{', '}');
+        if (!fullJson) break;
+        try {
+          const parsed = JSON.parse(fullJson);
+          if (parsed.matchup && parsed.pick) results.push(parsed);
+        } catch(e) {}
+        search = search.slice(idx + 8 + fullJson.length);
       }
       return results;
     }
@@ -1049,7 +1057,7 @@ CRITICAL RULES:
       } catch(e) { console.error('Parlay parse error:', e); addMsg('ai', mdToHtml(raw.replace(/PARLAY[\s\S]*/,'')), raw); }
     } else if (allBetcards.length > 1) {
       // Multiple BETCARDs — show all as cards (predict all games mode)
-      const cleanText = raw.replace(/BETCARD:\s*\{[^}]+\}/g, '').trim();
+      const cleanText = raw.replace(/BETCARD:\s*\{[^{}]*\}/g, '').replace(/\n\s*\n/g,'\n').trim();
       // Store all betcards so user can log any of them
       S.allPendingBets = allBetcards.map(bc => {
         const sr = calcStake(bc.prob, bc.suggestedOdds||bc.odds||2.0);
@@ -1068,7 +1076,7 @@ CRITICAL RULES:
         const sr = calcStake(bc.prob, bc.suggestedOdds||2.0);
         S.pendingBet = {...bc, stake:sr.stake, stakeResult:sr, id:Date.now().toString()};
         save();
-        const cleanText = raw.replace(/BETCARD[\s\S]*/, '').trim();
+        const cleanText = raw.replace(/BETCARD:\s*\{[^{}]*\}/g, '').replace(/\n\s*\n/g,'\n').trim();
         // Calculate Edge Score in background, show card immediately then update
         const [homeTeam, awayTeam] = bc.matchup.includes(' vs ') ? bc.matchup.split(' vs ') : bc.matchup.split(' @ ').reverse();
         const msgEl = addMsg('ai', mdToHtml(cleanText)+buildBetCard(bc,sr,null), raw);
