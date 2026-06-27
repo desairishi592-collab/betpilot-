@@ -226,7 +226,203 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:
 </div>
 
 <script>
-/* ── DATA LAYER ── */
+/* ── EDGE SCORE SYSTEM ── */
+// Maps sport names to Odds API sport keys
+const ODDS_SPORT_MAP = {
+  NFL: 'americanfootball_nfl',
+  NBA: 'basketball_nba',
+  NHL: 'icehockey_nhl',
+  MLB: 'baseball_mlb',
+  'World Cup': 'soccer_fifa_world_cup'
+};
+
+// Cache odds data to preserve free-tier quota (500/month)
+const oddsCache = {};
+const ODDS_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+
+async function fetchLiveOdds(sport) {
+  const key = ODDS_SPORT_MAP[sport];
+  if (!key) return null;
+  const cached = oddsCache[sport];
+  if (cached && Date.now() - cached.ts < ODDS_CACHE_TTL) return cached.data;
+  try {
+    const r = await fetch(`/api/chat?odds=1&sport=${key}`);
+    if (!r.ok) return null;
+    const data = await r.json();
+    oddsCache[sport] = { data, ts: Date.now() };
+    return data;
+  } catch(e) { return null; }
+}
+
+function getBestOdds(oddsData, homeTeam, awayTeam) {
+  if (!oddsData?.length) return null;
+  // Find matching event
+  const event = oddsData.find(e => {
+    const h = e.home_team?.toLowerCase();
+    const a = e.away_team?.toLowerCase();
+    const homeQ = homeTeam.toLowerCase().split(' ').pop();
+    const awayQ = awayTeam.toLowerCase().split(' ').pop();
+    return h?.includes(homeQ) || a?.includes(awayQ);
+  });
+  if (!event) return null;
+
+  // Find best odds per outcome across all bookmakers
+  const best = {};
+  event.bookmakers?.forEach(book => {
+    book.markets?.[0]?.outcomes?.forEach(o => {
+      const name = o.name;
+      if (!best[name] || o.price > best[name].price) {
+        best[name] = { price: o.price, book: book.title };
+      }
+    });
+  });
+
+  // Line movement: compare best to worst odds to detect sharp action
+  const prices = {};
+  event.bookmakers?.forEach(book => {
+    book.markets?.[0]?.outcomes?.forEach(o => {
+      if (!prices[o.name]) prices[o.name] = [];
+      prices[o.name].push(o.price);
+    });
+  });
+
+  const movement = {};
+  Object.entries(prices).forEach(([name, arr]) => {
+    const min = Math.min(...arr);
+    const max = Math.max(...arr);
+    movement[name] = { spread: (max - min).toFixed(2), min: min.toFixed(2), max: max.toFixed(2) };
+  });
+
+  return { best, movement, bookCount: event.bookmakers?.length || 0, event };
+}
+
+// Calculate travel distance between two cities (simplified lat/lon)
+const TEAM_COORDS = {
+  // NFL
+  'Kansas City Chiefs': [39.0489, -94.4839],
+  'Philadelphia Eagles': [39.9012, -75.1675],
+  'Dallas Cowboys': [32.7473, -97.0945],
+  'New England Patriots': [42.0909, -71.2643],
+  'San Francisco 49ers': [37.4034, -121.9691],
+  'Los Angeles Rams': [33.9534, -118.3392],
+  'Buffalo Bills': [42.7738, -78.7870],
+  'Miami Dolphins': [25.9580, -80.2389],
+  'Chicago Bears': [41.8623, -87.6167],
+  'Green Bay Packers': [44.5013, -88.0622],
+  // NBA
+  'Los Angeles Lakers': [34.0430, -118.2673],
+  'Boston Celtics': [42.3662, -71.0621],
+  'Golden State Warriors': [37.7680, -122.3877],
+  'Miami Heat': [25.7814, -80.1870],
+  'New York Knicks': [40.7505, -73.9934],
+  'Chicago Bulls': [41.8807, -87.6742],
+  // NHL
+  'Toronto Maple Leafs': [43.6435, -79.3791],
+  'Montreal Canadiens': [45.4961, -73.5693],
+  // MLB
+  'New York Yankees': [40.8296, -73.9262],
+  'Los Angeles Dodgers': [34.0739, -118.2400],
+  'Boston Red Sox': [42.3467, -71.0972],
+};
+
+function calcTravelFatigue(awayTeam, homeTeam) {
+  const awayCoords = TEAM_COORDS[awayTeam];
+  const homeCoords = TEAM_COORDS[homeTeam];
+  if (!awayCoords || !homeCoords) return { miles: 0, tzDiff: 0, fatigueScore: 0 };
+  const R = 3959;
+  const dLat = (homeCoords[0] - awayCoords[0]) * Math.PI / 180;
+  const dLon = (homeCoords[1] - awayCoords[1]) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(awayCoords[0]*Math.PI/180) * Math.cos(homeCoords[0]*Math.PI/180) * Math.sin(dLon/2)**2;
+  const miles = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+  // Rough timezone difference from longitude
+  const tzDiff = Math.abs(Math.round((homeCoords[1] - awayCoords[1]) / 15));
+  // Fatigue score: 0-100 (higher = more fatigue for away team)
+  const fatigueScore = Math.min(Math.round((miles / 3000) * 60 + tzDiff * 10), 100);
+  return { miles, tzDiff, fatigueScore };
+}
+
+/* ── EDGE SCORE CALCULATOR ── */
+async function calcEdgeScore(sport, homeTeam, awayTeam, homeId, awayId, gameDate) {
+  const scores = {
+    lineup: 50,      // default neutral
+    lineMovement: 50,
+    propMismatch: 50,
+    travelFatigue: 50,
+    formInjury: 50
+  };
+  const reasons = [];
+
+  // 1. LINE MOVEMENT (25%) — from Odds API
+  const oddsData = await fetchLiveOdds(sport);
+  const oddsInfo = getBestOdds(oddsData, homeTeam, awayTeam);
+  let bestOddsStr = '';
+  if (oddsInfo) {
+    const homeOdds = oddsInfo.best[homeTeam] || Object.values(oddsInfo.best)[0];
+    const awayOdds = oddsInfo.best[awayTeam] || Object.values(oddsInfo.best)[1];
+    // If home has tighter odds spread = sharp money on home
+    const homeSpread = parseFloat(oddsInfo.movement[homeTeam]?.spread || 0);
+    const awaySpread = parseFloat(oddsInfo.movement[awayTeam]?.spread || 0);
+    if (homeSpread > 0.15) { scores.lineMovement = 72; reasons.push(`sharp line movement toward ${homeTeam}`); }
+    else if (awaySpread > 0.15) { scores.lineMovement = 28; reasons.push(`sharp line movement toward ${awayTeam}`); }
+    else scores.lineMovement = 50;
+
+    if (homeOdds) bestOddsStr = Object.entries(oddsInfo.best).map(([t,v]) => `${t.split(' ').pop()}: ${v.price} (${v.book})`).join(' | ');
+  }
+
+  // 2. TRAVEL & FATIGUE (20%)
+  const travel = calcTravelFatigue(awayTeam, homeTeam);
+  if (travel.miles > 2000) {
+    scores.travelFatigue = 75; // home advantage amplified by long away travel
+    reasons.push(`${awayTeam} traveled ${travel.miles} miles (${travel.tzDiff} TZ change)`);
+  } else if (travel.miles > 1000) {
+    scores.travelFatigue = 62;
+    reasons.push(`${awayTeam} moderate travel (${travel.miles} mi)`);
+  } else {
+    scores.travelFatigue = 50;
+  }
+
+  // Weighted Edge Score (from HOME team perspective)
+  const edgeScore = Math.round(
+    scores.lineup * 0.25 +
+    scores.lineMovement * 0.25 +
+    scores.propMismatch * 0.20 +
+    scores.travelFatigue * 0.20 +
+    scores.formInjury * 0.10
+  );
+
+  return {
+    score: edgeScore,
+    scores,
+    reasons,
+    bestOdds: bestOddsStr,
+    travel,
+    oddsInfo
+  };
+}
+
+function edgeScoreHTML(es, homeTeam) {
+  const score = es.score;
+  const color = score >= 65 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--red)';
+  const label = score >= 65 ? 'STRONG EDGE' : score >= 50 ? 'MODERATE' : 'WEAK';
+  const bars = [
+    { label: 'Line Movement', val: es.scores.lineMovement },
+    { label: 'Travel Fatigue', val: es.scores.travelFatigue },
+    { label: 'Form + Injury', val: es.scores.formInjury },
+  ];
+  return `<div style="background:var(--surface);border:1px solid ${color};border-radius:10px;padding:12px;margin-top:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">BetPilot Edge Score</span>
+      <span style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:700;color:${color}">${score} <span style="font-size:13px">${label}</span></span>
+    </div>
+    ${bars.map(b => `<div style="margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:3px"><span>${b.label}</span><span>${b.val}/100</span></div>
+      <div style="height:3px;background:var(--dim);border-radius:2px"><div style="height:100%;width:${b.val}%;background:${color};border-radius:2px;transition:width .5s"></div></div>
+    </div>`).join('')}
+    ${es.bestOdds ? `<div style="font-size:11px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">Best odds: <span style="color:var(--txt)">${es.bestOdds}</span></div>` : ''}
+    ${es.reasons.length ? `<div style="font-size:11px;color:var(--teal);margin-top:4px">⚡ ${es.reasons.join(' · ')}</div>` : ''}
+  </div>`;
+}
+
 const ESPN = {
   NFL:'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard',
   NBA:'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',
@@ -238,65 +434,138 @@ const ESPN_BASE = {
   NFL:'football/nfl',NBA:'basketball/nba',NHL:'hockey/nhl',
   MLB:'baseball/mlb','World Cup':'soccer/fifa.world'
 };
-function espnUrl(sport,path){return`https://site.api.espn.com/apis/site/v2/sports/${ESPN_BASE[sport]}/${path}`}
-async function safeJson(url){try{const r=await fetch(url);return await r.json()}catch(e){return null}}
+// Outdoor sports that need weather
+const OUTDOOR = ['NFL','MLB','World Cup'];
 
-async function fetchTeamInjuries(sport,teamId){
-  if(sport==='World Cup')return'';
+function espnUrl(sport,path){return`https://site.api.espn.com/apis/site/v2/sports/${ESPN_BASE[sport]}/${path}`}
+async function safeJson(url){try{const r=await fetch(url);if(!r.ok)return null;return await r.json()}catch(e){return null}}
+
+/* FACTOR 1: INJURIES */
+async function fetchInjuries(sport,teamId){
+  if(sport==='World Cup')return'None reported';
   const d=await safeJson(espnUrl(sport,`teams/${teamId}/injuries`));
   const items=d?.injuries||[];
   if(!items.length)return'None reported';
-  return items.slice(0,4).map(i=>`${i.athlete?.displayName||'?'} (${i.athlete?.position?.abbreviation||'?'}) — ${i.status||'Questionable'}`).join(', ');
+  const key=items.filter(i=>['Out','Doubtful'].includes(i.status));
+  const q=items.filter(i=>i.status==='Questionable');
+  const parts=[];
+  if(key.length)parts.push(`OUT/DOUBTFUL: ${key.slice(0,3).map(i=>`${i.athlete?.displayName} (${i.athlete?.position?.abbreviation||'?'})`).join(', ')}`);
+  if(q.length)parts.push(`Questionable: ${q.slice(0,2).map(i=>i.athlete?.displayName).join(', ')}`);
+  return parts.join(' | ')||'None reported';
 }
 
-async function fetchTeamForm(sport,teamId){
+/* FACTOR 2: RECENT FORM (last 5) */
+async function fetchForm(sport,teamId){
   const d=await safeJson(espnUrl(sport,`teams/${teamId}/schedule`));
   const events=d?.events||[];
   const done=events.filter(e=>e.competitions?.[0]?.status?.type?.completed).slice(-5);
   if(!done.length)return'No recent data';
-  return done.map(e=>{
+  const results=done.map(e=>{
     const comp=e.competitions[0];
     const w=comp.competitors.find(c=>c.winner);
     const l=comp.competitors.find(c=>!c.winner);
-    if(!w)return'Draw';
+    if(!w)return'D';
     return`${w.team.abbreviation} def ${l.team.abbreviation} ${w.score}-${l.score}`;
-  }).join(' | ');
+  });
+  const wl=done.map(e=>{
+    const comp=e.competitions[0];
+    const w=comp.competitors.find(c=>c.winner);
+    return w?'W':'L';
+  }).join('');
+  return`${wl} | ${results.join(', ')}`;
 }
 
-async function fetchTeamNews(sport,teamId){
-  const d=await safeJson(espnUrl(sport,`teams/${teamId}/news`));
-  const items=d?.articles||[];
-  if(!items.length)return'';
-  return items.slice(0,2).map(a=>a.headline).join(' | ');
+/* FACTOR 3: HOME/AWAY — derived from scoreboard, no extra call needed */
+
+/* FACTOR 4: HEAD-TO-HEAD */
+async function fetchH2H(sport,teamId,opponentId){
+  // ESPN doesn't expose H2H directly — use schedule and filter for opponent
+  const d=await safeJson(espnUrl(sport,`teams/${teamId}/schedule`));
+  const events=d?.events||[];
+  const h2h=events.filter(e=>{
+    const comp=e.competitions[0];
+    return comp?.status?.type?.completed &&
+      comp.competitors.some(c=>c.team.id===opponentId);
+  }).slice(-8);
+  if(!h2h.length)return'No recent H2H data';
+  let wins=0,losses=0;
+  h2h.forEach(e=>{
+    const comp=e.competitions[0];
+    const me=comp.competitors.find(c=>c.team.id===teamId);
+    if(me?.winner)wins++;else losses++;
+  });
+  return`${wins}W-${losses}L in last ${h2h.length} meetings`;
 }
 
-async function fetchStandings(sport){
-  const d=await safeJson(espnUrl(sport,'standings'));
-  if(!d)return'';
+/* FACTOR 5: REST — days since last game */
+async function fetchRest(sport,teamId){
+  const d=await safeJson(espnUrl(sport,`teams/${teamId}/schedule`));
+  const events=d?.events||[];
+  const done=events.filter(e=>e.competitions?.[0]?.status?.type?.completed);
+  if(!done.length)return'Unknown';
+  const last=done[done.length-1];
+  const lastDate=new Date(last.date);
+  const today=new Date();
+  const days=Math.round((today-lastDate)/(1000*60*60*24));
+  if(days===0)return'Playing today (back-to-back)';
+  if(days===1)return'1 day rest';
+  return`${days} days rest`;
+}
+
+/* FACTOR 6: WEATHER (Open-Meteo, no key needed) */
+async function fetchWeather(sport,venueLat,venueLon,gameTime){
+  if(!OUTDOOR.includes(sport)||!venueLat)return'';
   try{
-    const groups=d.standings?.entries||d.children?.[0]?.standings?.entries||[];
-    if(!groups.length)return'';
-    return groups.slice(0,8).map(e=>{
-      const rec=e.stats?.find(s=>s.name==='wins')?.displayValue||'';
-      return`${e.team?.displayName||'?'}: ${rec}`;
-    }).join(', ');
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${venueLat}&longitude=${venueLon}&hourly=temperature_2m,wind_speed_10m,precipitation_probability&wind_speed_unit=mph&temperature_unit=fahrenheit&forecast_days=1`;
+    const d=await safeJson(url);
+    if(!d?.hourly)return'';
+    const hour=new Date(gameTime).getHours();
+    const idx=Math.min(hour,23);
+    const temp=d.hourly.temperature_2m?.[idx];
+    const wind=d.hourly.wind_speed_10m?.[idx];
+    const precip=d.hourly.precipitation_probability?.[idx];
+    if(temp==null)return'';
+    let note='';
+    if(wind>20)note+=' ⚠️ High wind (affects passing/kicking)';
+    if(precip>60)note+=' ⚠️ Rain likely (suppresses scoring)';
+    if(temp<32)note+=' ⚠️ Freezing conditions';
+    return`${Math.round(temp)}°F, wind ${Math.round(wind)}mph, ${precip}% rain chance${note}`;
   }catch(e){return''}
 }
 
-/* Polymarket: fetch active sports markets matching today's teams */
-async function fetchPolymarketOdds(homeTeam,awayTeam){
+/* FACTOR 7: LINE MOVEMENT (Polymarket) */
+async function fetchLineMovement(homeTeam,awayTeam){
   try{
-    // Search Polymarket's gamma API for markets matching these teams
     const q=encodeURIComponent(`${homeTeam} ${awayTeam}`);
     const d=await safeJson(`https://gamma-api.polymarket.com/markets?search=${q}&limit=5&active=true`);
-    if(!d||!d.length)return'';
+    if(!d?.length)return'';
     const market=d[0];
     if(!market.outcomes||!market.outcomePrices)return'';
     const outcomes=JSON.parse(market.outcomes||'[]');
     const prices=JSON.parse(market.outcomePrices||'[]');
     if(!outcomes.length)return'';
-    const parts=outcomes.map((o,i)=>`${o}: ${(parseFloat(prices[i]||0)*100).toFixed(0)}%`);
-    return`Prediction market: ${parts.join(', ')} (${market.volume?'$'+Math.round(market.volume)+' volume':''})`;
+    const vol=market.volume?`$${Math.round(market.volume)} wagered`:'';
+    return`Sharp money: ${outcomes.map((o,i)=>`${o} ${(parseFloat(prices[i]||0)*100).toFixed(0)}%`).join(' vs ')}${vol?' ('+vol+')':''}`;
+  }catch(e){return''}
+}
+
+/* TEAM NEWS */
+async function fetchNews(sport,teamId){
+  const d=await safeJson(espnUrl(sport,`teams/${teamId}/news`));
+  const items=d?.articles||[];
+  return items.slice(0,2).map(a=>a.headline).join(' | ')||'';
+}
+
+/* STANDINGS */
+async function fetchStandings(sport){
+  const d=await safeJson(espnUrl(sport,'standings'));
+  if(!d)return'';
+  try{
+    const entries=d.standings?.entries||d.children?.[0]?.standings?.entries||[];
+    return entries.slice(0,8).map(e=>{
+      const w=e.stats?.find(s=>s.name==='wins')?.displayValue||'';
+      return`${e.team?.abbreviation||'?'} ${w}`;
+    }).join(', ');
   }catch(e){return''}
 }
 
@@ -315,50 +584,93 @@ async function fetchSchedule(sport){
   }).join('\n');
 }
 
+/* MASTER FETCH — all 7 factors per game */
 async function fetchFullContext(sport){
   const d=await safeJson(ESPN[sport]);
   const events=d?.events||[];
   if(!events.length)return`No ${sport} games today.`;
 
-  // fetch standings once
-  const standings=await fetchStandings(sport);
-
+  const [standings]=await Promise.all([fetchStandings(sport)]);
   const lines=[];
+
   for(const e of events.slice(0,5)){
     const comp=e.competitions[0];
     const home=comp.competitors.find(c=>c.homeAway==='home');
     const away=comp.competitors.find(c=>c.homeAway==='away');
     const status=e.status.type.description;
     const time=status==='Scheduled'?new Date(e.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):status;
-    const score=status!=='Scheduled'?` | Score: ${away.score||0}-${home.score||0}`:'';
+    const score=status!=='Scheduled'?` | LIVE: ${away.score||0}-${home.score||0}`:'';
     const homeRec=home.records?.[0]?.summary||'';
     const awayRec=away.records?.[0]?.summary||'';
 
-    // fetch all data sources in parallel
-    const [hi,ai,hf,af,hn,an,poly]=await Promise.all([
-      fetchTeamInjuries(sport,home.team.id),
-      fetchTeamInjuries(sport,away.team.id),
-      fetchTeamForm(sport,home.team.id),
-      fetchTeamForm(sport,away.team.id),
-      fetchTeamNews(sport,home.team.id),
-      fetchTeamNews(sport,away.team.id),
-      fetchPolymarketOdds(home.team.displayName,away.team.displayName),
+    // venue coords for weather (ESPN sometimes provides them)
+    const venue=comp.venue;
+    const lat=venue?.address?.latitude||null;
+    const lon=venue?.address?.longitude||null;
+
+    // Fire all 7 factors in parallel
+    const [
+      homeInj, awayInj,           // Factor 1: Injuries
+      homeForm, awayForm,          // Factor 2: Form
+                                   // Factor 3: Home/Away (from scoreboard)
+      homeH2H,                     // Factor 4: H2H
+      homeRest, awayRest,          // Factor 5: Rest
+      weather,                     // Factor 6: Weather
+      lineMovement,                // Factor 7: Line movement
+      homeNews, awayNews           // Bonus: News
+    ] = await Promise.all([
+      fetchInjuries(sport, home.team.id),
+      fetchInjuries(sport, away.team.id),
+      fetchForm(sport, home.team.id),
+      fetchForm(sport, away.team.id),
+      fetchH2H(sport, home.team.id, away.team.id),
+      fetchRest(sport, home.team.id),
+      fetchRest(sport, away.team.id),
+      fetchWeather(sport, lat, lon, e.date),
+      fetchLineMovement(home.team.displayName, away.team.displayName),
+      fetchNews(sport, home.team.id),
+      fetchNews(sport, away.team.id),
     ]);
 
     lines.push(
-      `GAME: ${away.team.displayName}${awayRec?' ('+awayRec+')':''} @ ${home.team.displayName}${homeRec?' ('+homeRec+')':''} — ${time}${score}\n`+
-      `  Injuries ${home.team.displayName}: ${hi||'None'}\n`+
-      `  Injuries ${away.team.displayName}: ${ai||'None'}\n`+
-      `  Form ${home.team.displayName} (last 5): ${hf}\n`+
-      `  Form ${away.team.displayName} (last 5): ${af}\n`+
-      (hn?`  News ${home.team.displayName}: ${hn}\n`:'')+
-      (an?`  News ${away.team.displayName}: ${an}\n`:'')+
-      (poly?`  ${poly}\n`:'')
+      `━━ GAME: ${away.team.displayName}${awayRec?' ('+awayRec+')':''} @ ${home.team.displayName}${homeRec?' ('+homeRec+')':''} — ${time}${score}\n`+
+      `  [1-INJURIES] ${home.team.displayName}: ${homeInj}\n`+
+      `  [1-INJURIES] ${away.team.displayName}: ${awayInj}\n`+
+      `  [2-FORM] ${home.team.displayName} last 5: ${homeForm}\n`+
+      `  [2-FORM] ${away.team.displayName} last 5: ${awayForm}\n`+
+      `  [3-HOME ADVANTAGE] ${home.team.displayName} is HOME\n`+
+      `  [4-H2H] ${home.team.displayName} vs ${away.team.displayName}: ${homeH2H}\n`+
+      `  [5-REST] ${home.team.displayName}: ${homeRest} | ${away.team.displayName}: ${awayRest}\n`+
+      (weather?`  [6-WEATHER] ${weather}\n`:'')+
+      (lineMovement?`  [7-LINE MOVEMENT] ${lineMovement}\n`:'')+
+      (homeNews?`  [NEWS] ${home.team.displayName}: ${homeNews}\n`:'')+
+      (awayNews?`  [NEWS] ${away.team.displayName}: ${awayNews}\n`:'')
     );
   }
 
-  return lines.join('\n\n')+(standings?`\n\nCurrent standings: ${standings}`:'');
+  // Fetch real bookmaker odds and add best prices
+  const oddsData = await fetchLiveOdds(sport);
+  let oddsContext = '';
+  if (oddsData?.length) {
+    const oddsLines = [];
+    for (const e of events.slice(0,5)) {
+      const comp = e.competitions[0];
+      const home = comp.competitors.find(c=>c.homeAway==='home');
+      const away = comp.competitors.find(c=>c.homeAway==='away');
+      const info = getBestOdds(oddsData, home.team.displayName, away.team.displayName);
+      if (info?.best) {
+        const prices = Object.entries(info.best).map(([t,v])=>`${t.split(' ').pop()}: ${v.price} @ ${v.book}`).join(' | ');
+        const travel = calcTravelFatigue(away.team.displayName, home.team.displayName);
+        oddsLines.push(`  [BEST ODDS] ${home.team.displayName} vs ${away.team.displayName}: ${prices}` +
+          (travel.miles > 500 ? ` | Away travel: ${travel.miles}mi (fatigue factor)` : ''));
+      }
+    }
+    if (oddsLines.length) oddsContext = '\n\nLIVE BOOKMAKER ODDS:\n' + oddsLines.join('\n');
+  }
+
+  return lines.join('\n') + oddsContext + (standings?`\n\nStandings: ${standings}`:'');
 }
+
 
 
 
@@ -637,15 +949,16 @@ CURRENT DATA FOR ${S.sport}:
 ${dataContext}
 
 RULES:
-1. Use the data above — schedules, injuries, records, form, news, standings, prediction market odds. Never mention data sources.
-2. For a single bet: pick ONE game, 2-3 sentences of specific analysis, estimate win probability, suggest decimal odds. End with:
-   BETCARD:{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"one line citing real data","prob":0.62,"suggestedOdds":2.10,"market":"Moneyline"}
-3. For a PARLAY request: find 2-3 games today where you have high confidence (60%+ each). Briefly explain why each leg is strong. End with a JSON array (all on one line):
-   PARLAY:[{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"reason","prob":0.62,"odds":1.85},{"matchup":"Team C vs Team D","sport":"${S.sport}","pick":"Team C","reason":"reason","prob":0.65,"odds":1.75}]
-4. For parlays: only suggest when you genuinely have 2-3 high confidence picks. Never force a parlay if the games aren't there.
-5. Max 3 short paragraphs. Use **bold** for key points.
-6. If no games today, say so and offer another sport.
-7. Never ask the user to manually settle bets — it's automatic.`;
+1. You have ALL 7 BETTING FACTORS for each game: [1-INJURIES], [2-FORM], [3-HOME ADVANTAGE], [4-H2H], [5-REST], [6-WEATHER], [7-LINE MOVEMENT]. Use ALL of them.
+2. Never mention data sources. Speak naturally: "they have 3 days rest vs 1 for the visitors", "sharp money is leaning home", "their starting QB is out".
+3. When recommending a single bet: weigh all 7 factors, explain which 2-3 tipped your decision, give win probability. End with:
+   BETCARD:{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"top 2-3 factors that decided this","prob":0.62,"suggestedOdds":2.10,"market":"Moneyline"}
+4. For PARLAY request: find 2-3 games where multiple factors align strongly (60%+ each). End with:
+   PARLAY:[{"matchup":"Team A vs Team B","sport":"${S.sport}","pick":"Team A","reason":"key factors","prob":0.62,"odds":1.85},{"matchup":"Team C vs Team D","sport":"${S.sport}","pick":"Team C","reason":"key factors","prob":0.65,"odds":1.75}]
+5. Factor weighting: Injuries > Form > Rest/Schedule > H2H > Home advantage > Line movement > Weather. But if weather is severe, it overrides everything for totals.
+6. Rest matters most in NBA (back-to-backs destroy teams). H2H matters most in rivalries and playoffs.
+7. Max 3 paragraphs. **Bold** the single most important factor. No games = offer another sport.
+8. Never ask user to settle bets — automatic.`;
 
   const chatHistory = (sportChats[S.sport] || [])
     .filter(m => m.role === 'user' || m.role === 'assistant')
@@ -687,7 +1000,20 @@ RULES:
         S.pendingBet = {...bc, stake:sr.stake, stakeResult:sr, id:Date.now().toString()};
         save();
         const cleanText = raw.replace(/BETCARD:\s*\{[\s\S]*?\}/, '').trim();
-        addMsg('ai', mdToHtml(cleanText)+buildBetCard(bc,sr), raw);
+        // Calculate Edge Score in background, show card immediately then update
+        const [homeTeam, awayTeam] = bc.matchup.includes(' vs ') ? bc.matchup.split(' vs ') : bc.matchup.split(' @ ').reverse();
+        const msgEl = addMsg('ai', mdToHtml(cleanText)+buildBetCard(bc,sr,null), raw);
+        // Async edge score — update card once calculated
+        calcEdgeScore(bc.sport||S.sport, homeTeam?.trim(), awayTeam?.trim(), null, null, new Date()).then(es => {
+          S.pendingBet.edgeScore = es;
+          save();
+          // Update the bet card in place
+          const cards = document.querySelectorAll('.bet-card');
+          if (cards.length) {
+            const lastCard = cards[cards.length-1];
+            lastCard.outerHTML = buildBetCard(bc, sr, es);
+          }
+        }).catch(()=>{});
       } catch(e) { addMsg('ai', mdToHtml(raw), raw); }
     } else {
       addMsg('ai', mdToHtml(raw), raw);
@@ -698,10 +1024,11 @@ RULES:
   }
 }
 
-function buildBetCard(bc, sr) {
+function buildBetCard(bc, sr, edgeScore) {
   const ec = sr.ev>0?'var(--green)':'var(--red)';
   const edgec = sr.edge>0?'var(--teal)':'var(--red)';
   const canBet = sr.stake>0;
+  const esHTML = edgeScore ? edgeScoreHTML(edgeScore, bc.pick) : '';
   return `<div class="bet-card">
     <div class="bet-card-sport">${bc.sport} · ${bc.market||'Moneyline'}</div>
     <div class="bet-card-matchup">${bc.matchup}</div>
@@ -711,8 +1038,9 @@ function buildBetCard(bc, sr) {
       <div class="bet-stat"><div class="bet-stat-val" style="color:${ec}">${sr.ev>=0?'+':''}${sr.ev.toFixed(3)}</div><div class="bet-stat-lbl">EV/$1</div></div>
       <div class="bet-stat"><div class="bet-stat-val">${(bc.prob*100).toFixed(0)}%</div><div class="bet-stat-lbl">Win prob</div></div>
     </div>
+    ${esHTML}
     ${canBet
-      ? `<div style="margin-bottom:10px;font-size:13px;color:var(--muted)">Stake: <strong style="color:var(--txt);font-size:15px">$${sr.stake.toFixed(2)}</strong> <span style="color:var(--muted)">(${sr.usedPct}% of bankroll)</span></div>
+      ? `<div style="margin:10px 0 8px;font-size:13px;color:var(--muted)">Stake: <strong style="color:var(--txt);font-size:15px">$${sr.stake.toFixed(2)}</strong> <span style="color:var(--muted)">(${sr.usedPct}% of bankroll)</span></div>
          <div class="bet-actions">
            <button class="bet-btn yes" onclick="logBet()">✓ Log — $${sr.stake.toFixed(2)}</button>
            <button class="bet-btn no" onclick="skipBet()">Skip</button>
